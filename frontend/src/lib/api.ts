@@ -118,7 +118,7 @@ export const api = {
   getPendingCalls: () =>
     request<{ roomId: string; vehicleName: string; vehicleNumber: string }[]>('/api/auth/calls/pending'),
 
-  setupProfile: (name: string, phone?: string) =>
+  setupProfile: (name: string, phone: string) =>
     request<{ setupComplete: boolean; owner: OwnerProfile }>('/api/auth/setup', {
       method: 'POST',
       body: JSON.stringify({ name, phone }),

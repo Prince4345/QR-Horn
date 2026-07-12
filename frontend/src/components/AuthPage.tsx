@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import { Loader2, Shield, Mail, Lock, User, Phone, Chrome } from 'lucide-react';
 import { useAuth, isSupabaseConfigured } from '../context/AuthContext';
@@ -7,7 +7,22 @@ type AuthMethod = 'email' | 'phone';
 type PhoneStep = 'enter' | 'otp';
 
 export default function AuthPage() {
-  const { signIn, signUp, signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, setupProfile, setupComplete, session, user, loading: authLoading, profileLoading, authError, clearAuthError } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithGoogle,
+    sendPhoneOtp,
+    verifyPhoneOtp,
+    setupProfile,
+    setupComplete,
+    session,
+    user,
+    owner,
+    loading: authLoading,
+    profileLoading,
+    authError,
+    clearAuthError,
+  } = useAuth();
 
   const [authMethod, setAuthMethod] = useState<AuthMethod>('email');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -20,6 +35,29 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupMessage, setSignupMessage] = useState<string | null>(null);
+  const [profilePrefillDone, setProfilePrefillDone] = useState(false);
+
+  const needsSetup = !!session && !setupComplete;
+
+  // Prefill name/phone for Google or OTP users on the complete-profile screen
+  useEffect(() => {
+    if (!needsSetup || profilePrefillDone) return;
+
+    const meta = user?.user_metadata ?? {};
+    const suggestedName =
+      owner?.name?.trim() ||
+      meta.full_name ||
+      meta.name ||
+      '';
+    const suggestedPhone =
+      owner?.phone?.trim() ||
+      user?.phone ||
+      '';
+
+    if (suggestedName && !name) setName(suggestedName);
+    if (suggestedPhone && !phone) setPhone(suggestedPhone);
+    setProfilePrefillDone(true);
+  }, [needsSetup, profilePrefillDone, user, owner, name, phone]);
 
   if (!isSupabaseConfigured) {
     return (
@@ -40,8 +78,6 @@ export default function AuthPage() {
     );
   }
 
-  const needsSetup = !!session && !setupComplete;
-
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -49,8 +85,8 @@ export default function AuthPage() {
     setSignupMessage(null);
     try {
       if (mode === 'signup') {
-        await signUp(email, password, name);
-        setSignupMessage('Account created! Check your email if confirmation is required.');
+        await signUp(email, password, name, phone);
+        setSignupMessage('Account created. Check your email if confirmation is required, then sign in.');
         setMode('login');
       } else {
         await signIn(email, password);
@@ -106,7 +142,7 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
     try {
-      await setupProfile(name, phone || user?.phone || undefined);
+      await setupProfile(name.trim(), phone.trim());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed');
     } finally {
@@ -124,9 +160,13 @@ export default function AuthPage() {
         <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Shield className="w-7 h-7 text-blue-400" />
         </div>
-        <h1 className="text-2xl font-bold mb-1">{needsSetup ? 'Complete Profile' : 'Owner Login'}</h1>
+        <h1 className="text-2xl font-bold mb-1">
+          {needsSetup ? 'Complete your profile' : 'Owner Login'}
+        </h1>
         <p className="text-white/50 text-sm">
-          {needsSetup ? 'Set up your owner account' : 'Sign in with Google, phone, or email'}
+          {needsSetup
+            ? 'We need your name and mobile number to send SMS alerts when someone contacts your vehicle.'
+            : 'Sign in with Google, phone, or email'}
         </p>
       </div>
 
@@ -146,26 +186,33 @@ export default function AuthPage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
+              placeholder="Your full name"
               required
               className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
             />
           </div>
-          {!user?.phone && (
+          <div className="relative">
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
+              type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone (optional)"
-              className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+              placeholder="Mobile number (e.g. 9876543210)"
+              required
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
             />
-          )}
+          </div>
+          <p className="text-xs text-white/40 text-center leading-relaxed">
+            Your mobile number is used for SMS alerts when someone scans your QR sticker.
+            Push notifications can also be enabled later on your phone.
+          </p>
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             type="submit"
-            disabled={loading || !name.trim()}
+            disabled={loading || !name.trim() || !phone.trim()}
             className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue to Dashboard'}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & continue'}
           </button>
         </form>
       ) : (
@@ -224,16 +271,29 @@ export default function AuthPage() {
 
               <form onSubmit={handleEmailSubmit} className="space-y-4">
                 {mode === 'signup' && (
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
-                      required
-                      className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
-                    />
-                  </div>
+                  <>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Your full name"
+                        required
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Mobile number (for SMS alerts)"
+                        required
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+                  </>
                 )}
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -262,7 +322,7 @@ export default function AuthPage() {
                 {signupMessage && <p className="text-green-400 text-sm">{signupMessage}</p>}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || (mode === 'signup' && (!name.trim() || !phone.trim()))}
                   className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'signup' ? 'Create Account' : 'Sign In'}
@@ -282,7 +342,9 @@ export default function AuthPage() {
                   className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
                 />
               </div>
-              <p className="text-xs text-white/40 text-center">We'll send a 6-digit OTP via SMS</p>
+              <p className="text-xs text-white/40 text-center">
+                We&apos;ll send a 6-digit OTP. New accounts will be asked for your name next.
+              </p>
               {error && <p className="text-red-400 text-sm">{error}</p>}
               <button
                 type="submit"
@@ -311,7 +373,7 @@ export default function AuthPage() {
                 disabled={loading || otp.length !== 6}
                 className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Sign In'}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & continue'}
               </button>
               <button
                 type="button"

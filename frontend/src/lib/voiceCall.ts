@@ -4,13 +4,13 @@ import { getSocketBase } from './apiBase';
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
   {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turns:openrelay.metered.ca:443',
+    ],
     username: 'openrelayproject',
     credential: 'openrelayproject',
   },
@@ -24,25 +24,47 @@ export interface IncomingCall {
   vehicleNumber: string;
 }
 
+type JoinAck = {
+  ok?: boolean;
+  status?: string;
+  reason?: 'not_found' | 'ended' | 'declined' | 'expired' | 'active' | 'ringing';
+};
+
 let sharedSocket: Socket | null = null;
 let registeredOwnerId: string | null = null;
+
+function attachOwnerReconnect(socket: Socket) {
+  socket.off('connect');
+  socket.on('connect', () => {
+    if (registeredOwnerId) {
+      socket.emit('owner:register', { ownerId: registeredOwnerId });
+    }
+  });
+}
 
 function getSocket(): Socket {
   const url = getSocketBase();
   if (!sharedSocket) {
-    sharedSocket = io(url, { transports: ['websocket', 'polling'], reconnection: true });
-    sharedSocket.on('connect', () => {
-      if (registeredOwnerId) {
-        sharedSocket?.emit('owner:register', { ownerId: registeredOwnerId });
-      }
+    sharedSocket = io(url, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 800,
     });
+    attachOwnerReconnect(sharedSocket);
   } else {
     try {
       const currentHost = sharedSocket.io.opts.hostname;
       const targetHost = new URL(url).hostname;
       if (currentHost !== targetHost) {
         sharedSocket.disconnect();
-        sharedSocket = io(url, { transports: ['websocket', 'polling'], reconnection: true });
+        sharedSocket = io(url, {
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 20,
+          reconnectionDelay: 800,
+        });
+        attachOwnerReconnect(sharedSocket);
       }
     } catch {
       // keep existing socket
@@ -51,15 +73,27 @@ function getSocket(): Socket {
   return sharedSocket;
 }
 
-function joinRoom(socket: Socket, roomId: string): Promise<void> {
+function joinRoom(socket: Socket, roomId: string): Promise<JoinAck> {
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Could not join call room')), 8000);
-    socket.emit('call:join', { roomId }, (res: { ok?: boolean }) => {
+    const timeout = setTimeout(() => reject(new Error('Could not join call room')), 10000);
+    socket.emit('call:join', { roomId }, (res: JoinAck) => {
       clearTimeout(timeout);
-      if (res?.ok) resolve();
-      else reject(new Error('Call room not found'));
+      resolve(res ?? { ok: false, reason: 'not_found' });
     });
   });
+}
+
+function joinErrorMessage(ack: JoinAck): string {
+  switch (ack.reason) {
+    case 'declined':
+      return 'Owner declined the call';
+    case 'expired':
+      return 'Owner did not answer in time';
+    case 'ended':
+      return 'Call already ended';
+    default:
+      return 'Call room not found or no longer available';
+  }
 }
 
 export class VoiceCallSession {
@@ -72,9 +106,10 @@ export class VoiceCallSession {
   private acceptPromise: Promise<void> | null = null;
   private iceQueue: RTCIceCandidateInit[] = [];
   private remoteSet = false;
+  private cleaned = false;
 
   private onOffer = async ({ roomId: rid, offer }: { roomId: string; offer: RTCSessionDescriptionInit }) => {
-    if (rid !== this.roomId || !offer) return;
+    if (rid !== this.roomId || !offer || this.cleaned) return;
     try {
       await this.pc.setRemoteDescription(offer);
       this.remoteSet = true;
@@ -86,11 +121,12 @@ export class VoiceCallSession {
     } catch (err) {
       console.error('handle offer failed:', err);
       this.setPhase('failed');
+      this.cleanup();
     }
   };
 
   private onAnswer = async ({ roomId: rid, answer }: { roomId: string; answer: RTCSessionDescriptionInit }) => {
-    if (rid !== this.roomId || !answer) return;
+    if (rid !== this.roomId || !answer || this.cleaned) return;
     try {
       await this.pc.setRemoteDescription(answer);
       this.remoteSet = true;
@@ -99,11 +135,12 @@ export class VoiceCallSession {
     } catch (err) {
       console.error('handle answer failed:', err);
       this.setPhase('failed');
+      this.cleanup();
     }
   };
 
   private onIce = async ({ roomId: rid, candidate }: { roomId: string; candidate: RTCIceCandidateInit }) => {
-    if (rid !== this.roomId || !candidate) return;
+    if (rid !== this.roomId || !candidate || this.cleaned) return;
     if (!this.remoteSet) {
       this.iceQueue.push(candidate);
       return;
@@ -137,23 +174,53 @@ export class VoiceCallSession {
 
   static async beginOutgoing(roomId: string): Promise<VoiceCallSession> {
     const socket = getSocket();
+    if (!socket.connected) {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('Could not connect to call server')), 10000);
+        socket.once('connect', () => {
+          clearTimeout(t);
+          resolve();
+        });
+        socket.connect();
+      });
+    }
+
     const session = new VoiceCallSession(socket, roomId);
-    await session.initLocalAudio();
-    await joinRoom(socket, roomId);
+    try {
+      await session.initLocalAudio();
+    } catch (err) {
+      session.cleanup();
+      const msg = err instanceof Error ? err.message : '';
+      if (/Permission|NotAllowed|denied/i.test(msg)) {
+        throw new Error('Microphone permission is required for voice calls');
+      }
+      throw new Error('Could not access microphone');
+    }
+
+    const ack = await joinRoom(socket, roomId);
+    if (!ack.ok) {
+      session.cleanup();
+      throw new Error(joinErrorMessage(ack));
+    }
+
     session.setPhase('ringing');
     return session;
   }
 
-  waitUntilAccepted(timeoutMs = 45000): Promise<void> {
+  waitUntilAccepted(timeoutMs = 55_000): Promise<void> {
     if (this.acceptPromise) return this.acceptPromise;
 
     this.acceptPromise = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.socket.off('call:accepted', onAccepted);
+        this.socket.emit('call:end', { roomId: this.roomId });
+        this.cleanup();
+        this.setPhase('failed');
         reject(new Error('Owner did not answer in time'));
       }, timeoutMs);
 
-      const onAccepted = async () => {
+      const onAccepted = async ({ roomId: rid }: { roomId?: string } = {}) => {
+        if (rid && rid !== this.roomId) return;
         clearTimeout(timeout);
         this.socket.off('call:accepted', onAccepted);
         try {
@@ -163,6 +230,8 @@ export class VoiceCallSession {
           this.setPhase('connecting');
           resolve();
         } catch (err) {
+          this.cleanup();
+          this.setPhase('failed');
           reject(err);
         }
       };
@@ -175,9 +244,35 @@ export class VoiceCallSession {
 
   static async startIncoming(roomId: string): Promise<VoiceCallSession> {
     const socket = getSocket();
+    if (!socket.connected) {
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('Could not connect to call server')), 10000);
+        socket.once('connect', () => {
+          clearTimeout(t);
+          resolve();
+        });
+        socket.connect();
+      });
+    }
+
     const session = new VoiceCallSession(socket, roomId);
-    await session.initLocalAudio();
-    await joinRoom(socket, roomId);
+    try {
+      await session.initLocalAudio();
+    } catch (err) {
+      session.cleanup();
+      const msg = err instanceof Error ? err.message : '';
+      if (/Permission|NotAllowed|denied/i.test(msg)) {
+        throw new Error('Microphone permission is required to answer calls');
+      }
+      throw new Error('Could not access microphone');
+    }
+
+    const ack = await joinRoom(socket, roomId);
+    if (!ack.ok) {
+      session.cleanup();
+      throw new Error(joinErrorMessage(ack));
+    }
+
     socket.emit('call:accept', { roomId });
     session.setPhase('connecting');
     return session;
@@ -224,17 +319,22 @@ export class VoiceCallSession {
     };
 
     this.pc.onicecandidate = (event) => {
-      if (event.candidate) {
+      if (event.candidate && !this.cleaned) {
         this.socket.emit('webrtc:ice', { roomId: this.roomId, candidate: event.candidate });
       }
     };
 
     this.pc.onconnectionstatechange = () => {
+      if (this.cleaned) return;
       const state = this.pc.connectionState;
       if (state === 'connected') {
         this.setPhase('active');
       } else if (state === 'failed') {
         this.setPhase('failed');
+        this.cleanup();
+      } else if (state === 'closed') {
+        this.setPhase('ended');
+        this.cleanup();
       }
     };
   }
@@ -248,16 +348,24 @@ export class VoiceCallSession {
   }
 
   end() {
-    this.socket.emit('call:end', { roomId: this.roomId });
+    if (!this.cleaned) {
+      this.socket.emit('call:end', { roomId: this.roomId });
+    }
     this.cleanup();
     this.setPhase('ended');
   }
 
   private cleanup() {
+    if (this.cleaned) return;
+    this.cleaned = true;
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
-    if (this.pc.connectionState !== 'closed') {
-      this.pc.close();
+    try {
+      if (this.pc.connectionState !== 'closed') {
+        this.pc.close();
+      }
+    } catch {
+      // ignore
     }
     this.socket.off('webrtc:offer', this.onOffer);
     this.socket.off('webrtc:answer', this.onAnswer);
@@ -272,6 +380,8 @@ export function registerOwnerSocket(ownerId: string) {
   const socket = getSocket();
   if (socket.connected) {
     socket.emit('owner:register', { ownerId });
+  } else {
+    socket.connect();
   }
 }
 

@@ -21,13 +21,13 @@ interface AuthContextValue {
   profileLoading: boolean;
   authError: string | null;
   clearAuthError: () => void;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, phone: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   sendPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
-  setupProfile: (name: string, phone?: string) => Promise<void>;
+  setupProfile: (name: string, phone: string) => Promise<void>;
   enablePushNotifications: () => Promise<boolean>;
   preparePushNotifications: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -52,7 +52,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [firebaseConfig, setFirebaseConfig] = useState<FirebasePublicConfig | null>(null);
-  const autoSetupAttempted = useRef<string | null>(null);
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
 
@@ -117,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSetupComplete(false);
       setPushEnabled(false);
       setProfileLoading(false);
-      autoSetupAttempted.current = null;
       return;
     }
 
@@ -132,10 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const profile = await api.getMe().catch((err) => {
           if (!cancelled) {
+            const msg = err instanceof Error ? err.message : '';
             setAuthError(
-              err instanceof Error && err.message.includes('timed out')
-                ? 'Backend is not running — restart with npm run dev'
-                : 'Could not reach server — is the backend running on port 3001?'
+              msg.includes('timed out') || /Failed to fetch|NetworkError/i.test(msg)
+                ? 'Could not reach the server. Wait a few seconds if the site is waking up, then tap Retry.'
+                : msg || 'Could not load your account. Please try again.'
             );
           }
           return null;
@@ -148,36 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (profile.setupComplete) {
-          setAuthError(null);
-          setSetupComplete(true);
-          setOwner(profile.owner ?? null);
-          setPushEnabled(!!profile.owner?.fcmToken);
-          return;
-        }
-
-        setSetupComplete(false);
-        setOwner(null);
-
-        const userId = session.user.id;
-        if (autoSetupAttempted.current === userId) return;
-        autoSetupAttempted.current = userId;
-
-        const meta = session.user.user_metadata ?? {};
-        const name = meta.full_name || meta.name;
-        if (!name) return;
-
-        await api.setupProfile(name, session.user.phone ?? undefined);
-        if (!cancelled) {
-          const updated = await api.getMe();
-          setAuthError(null);
-          setSetupComplete(updated.setupComplete);
-          setOwner(updated.owner ?? null);
-          setPushEnabled(!!updated.owner?.fcmToken);
-        }
+        // Existing accounts go to dashboard; incomplete profiles show name + phone form
+        setAuthError(null);
+        setSetupComplete(profile.setupComplete);
+        setOwner(profile.owner ?? null);
+        setPushEnabled(!!profile.owner?.fcmToken);
       } catch {
         if (!cancelled) {
-          setAuthError('Account setup failed — check that the backend is running.');
+          setAuthError('Could not load your account. Please try again.');
         }
       } finally {
         clearTimeout(profileTimeout);
@@ -191,23 +168,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
-  const setupProfile = async (name: string, phone?: string) => {
+  const setupProfile = async (name: string, phone: string) => {
     setProfileLoading(true);
+    setAuthError(null);
     try {
       await api.setupProfile(name, phone);
       await refreshProfile();
+    } catch (err) {
+      // Keep user on the form; surface the API message (e.g. invalid phone)
+      throw err;
     } finally {
       setProfileLoading(false);
     }
   };
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, name: string, phone: string) => {
     if (!supabase) throw new Error('Auth not configured');
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
     if (data.session) {
       setSession(data.session);
-      await api.setupProfile(name);
+      await api.setupProfile(name, phone);
       await refreshProfile();
     }
   };
@@ -253,7 +234,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setOwner(null);
     setSetupComplete(false);
-    autoSetupAttempted.current = null;
   };
 
   const ensureFirebaseConfig = useCallback(async (): Promise<FirebasePublicConfig> => {

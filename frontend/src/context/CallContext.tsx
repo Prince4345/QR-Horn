@@ -27,16 +27,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [callPhase, setCallPhase] = useState<CallPhase>('idle');
   const sessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const busyRef = useRef(false);
+
+  useEffect(() => {
+    busyRef.current =
+      callPhase === 'ringing' ||
+      callPhase === 'connecting' ||
+      callPhase === 'active' ||
+      !!incomingCall;
+  }, [callPhase, incomingCall]);
 
   useEffect(() => {
     if (!owner?.id) return;
     registerOwnerSocket(owner.id);
     const unsub = subscribeIncomingCalls((call) => {
+      // Ignore new rings while already in a call
+      if (busyRef.current && incomingCall?.roomId !== call.roomId) return;
       setIncomingCall(call);
       setCallPhase('ringing');
     });
     return unsub;
-  }, [owner?.id]);
+  }, [owner?.id, incomingCall?.roomId]);
 
   useEffect(() => {
     if (!owner?.id) return;
@@ -45,7 +56,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const poll = async () => {
-      if (incomingCall || callPhase === 'active' || callPhase === 'connecting') return;
+      if (busyRef.current && callPhase !== 'idle') return;
       try {
         const pending = await api.getPendingCalls();
         if (pending.length > 0) {
@@ -66,14 +77,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       await waitForApiReady();
       if (cancelled) return;
       poll();
-      interval = setInterval(poll, 3000);
+      interval = setInterval(poll, 2500);
     })();
 
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
     };
-  }, [owner?.id, incomingCall, callPhase]);
+  }, [owner?.id, callPhase]);
 
   const attachRemote = useCallback((stream: MediaStream) => {
     if (remoteAudioRef.current) {
@@ -84,16 +95,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const acceptIncomingCall = useCallback(async () => {
     if (!incomingCall) return;
+    const roomId = incomingCall.roomId;
+    setCallPhase('connecting');
     try {
-      const session = await VoiceCallSession.startIncoming(incomingCall.roomId);
+      const session = await VoiceCallSession.startIncoming(roomId);
       sessionRef.current = session;
-      session.onPhase(setCallPhase);
+      session.onPhase((phase) => {
+        setCallPhase(phase);
+        if (phase === 'failed' || phase === 'ended' || phase === 'declined') {
+          sessionRef.current = null;
+          setIncomingCall(null);
+          setTimeout(() => setCallPhase('idle'), 1500);
+        }
+      });
       session.onRemote(attachRemote);
       setIncomingCall(null);
     } catch (err) {
       console.error('Accept call failed:', err);
+      declineIncomingCall(roomId);
       setCallPhase('failed');
       setIncomingCall(null);
+      setTimeout(() => setCallPhase('idle'), 2000);
     }
   }, [incomingCall, attachRemote]);
 
@@ -109,6 +131,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const endActiveCall = useCallback(() => {
     sessionRef.current?.end();
     sessionRef.current = null;
+    setIncomingCall(null);
     setCallPhase('ended');
     setTimeout(() => setCallPhase('idle'), 1500);
   }, []);

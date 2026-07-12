@@ -62,21 +62,21 @@ function PhoneAlertsBanner({
     <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
       <p className="text-amber-200 text-sm font-medium mb-2">Get alerts on your phone</p>
       {isMobile ? (
-        <p className="text-amber-100/70 text-xs mb-3">
-          Tap below to allow notifications on <strong>this phone</strong>. Alerts only go to devices where you enable them.
+        <p className="text-amber-100/70 text-xs mb-3 leading-relaxed">
+          Tap below to allow notifications on <strong>this phone</strong>. Alerts are delivered only to devices where you enable them.
         </p>
       ) : (
-        <p className="text-amber-100/70 text-xs mb-3">
+        <p className="text-amber-100/70 text-xs mb-3 leading-relaxed">
           Desktop alerts do <strong>not</strong> reach your phone. Open{' '}
           <span className="font-mono text-amber-100">{window.location.origin}</span> on your phone,
-          log in here, and enable notifications there.
+          sign in, and enable notifications there.
         </p>
       )}
-      {!hasPhone && (
-        <p className="text-amber-100/60 text-xs mb-3">
-          Add your phone number in your profile for SMS text alerts (works even when the app is closed).
-        </p>
-      )}
+      <p className="text-amber-100/60 text-xs mb-3 leading-relaxed">
+        {hasPhone
+          ? 'Alerts can also be sent by SMS to your saved mobile number — even when the app is closed.'
+          : 'Add your mobile number in your profile so we can also send SMS alerts when the app is closed.'}
+      </p>
       <button
         onClick={onEnable}
         disabled={pushLoading}
@@ -95,9 +95,9 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onOpenScan, isActive = true }: DashboardProps) {
-  const { session, setupComplete, profileLoading, owner, authError, refreshProfile, signOut } = useAuth();
+  const { session, setupComplete, profileLoading, owner, authError, refreshProfile, signOut, clearAuthError } = useAuth();
 
-  if (profileLoading && !owner) {
+  if (profileLoading && !owner && !authError) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
@@ -105,25 +105,35 @@ export default function Dashboard({ onOpenScan, isActive = true }: DashboardProp
     );
   }
 
-  if (session && authError && !setupComplete) {
-    return (
-      <div className="w-full max-w-md text-center py-16 px-6">
-        <p className="text-red-400 mb-4">{authError}</p>
-        <p className="text-white/50 text-sm mb-6">You are signed in, but the server could not load your profile.</p>
-        <button
-          onClick={() => refreshProfile()}
-          className="px-6 py-3 bg-blue-600 rounded-xl font-semibold mr-3"
-        >
-          Retry
-        </button>
-        <button onClick={signOut} className="px-6 py-3 bg-white/10 rounded-xl">
-          Sign out
-        </button>
-      </div>
-    );
+  // Signed in but profile incomplete → always show name/phone form (not a hard error)
+  if (session && !setupComplete) {
+    // Soft errors (e.g. old auto-setup 400) should not block the profile form
+    if (authError && /backend|timed out|Could not reach|port 3001/i.test(authError)) {
+      return (
+        <div className="w-full max-w-md text-center py-16 px-6">
+          <p className="text-red-400 mb-4">{authError}</p>
+          <p className="text-white/50 text-sm mb-6">
+            You are signed in, but we could not reach the server. Check that the site is awake and try again.
+          </p>
+          <button
+            onClick={() => {
+              clearAuthError();
+              refreshProfile();
+            }}
+            className="px-6 py-3 bg-blue-600 rounded-xl font-semibold mr-3"
+          >
+            Retry
+          </button>
+          <button onClick={signOut} className="px-6 py-3 bg-white/10 rounded-xl">
+            Sign out
+          </button>
+        </div>
+      );
+    }
+    return <AuthPage />;
   }
 
-  if (!session || !setupComplete) {
+  if (!session) {
     return <AuthPage />;
   }
 

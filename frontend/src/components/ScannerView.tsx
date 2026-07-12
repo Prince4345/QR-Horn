@@ -153,14 +153,14 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       session.onPhase((phase) => {
         setCallPhase(phase);
         if (phase === 'failed') {
-          setError('Voice connection failed — try again on the same Wi‑Fi network');
-          callSessionRef.current?.end();
+          setError('Voice connection failed. Allow microphone access and try again.');
           callSessionRef.current = null;
           setStatus('idle');
           setCallPhase('idle');
         }
         if (phase === 'declined' || phase === 'ended') {
           setSuccessMessage(phase === 'declined' ? 'Owner declined the call.' : 'Call ended.');
+          callSessionRef.current = null;
           setStatus('success');
         }
       });
@@ -175,7 +175,8 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
 
       await session.waitUntilAccepted();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Call failed');
+      const message = err instanceof Error ? err.message : 'Call failed';
+      setError(message);
       callSessionRef.current?.end();
       callSessionRef.current = null;
       setStatus('idle');
@@ -432,10 +433,10 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                 </h3>
                 <p className="text-slate-400 mb-6">
                   {callPhase === 'active'
-                    ? 'Voice call in progress — speak through your device.'
+                    ? 'Voice call in progress — speak through your device. No phone numbers are shared.'
                     : callPhase === 'connecting'
-                      ? 'Owner accepted — setting up secure voice...'
-                      : 'Owner must open Dashboard on another device and tap Accept.'}
+                      ? 'Owner accepted — connecting secure voice…'
+                      : 'Anonymous in-app call. The owner gets an alert and can Accept in their dashboard.'}
                 </p>
                 <button
                   onClick={handleEndCall}
