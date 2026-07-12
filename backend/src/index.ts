@@ -74,3 +74,19 @@ httpServer.listen(PORT, '0.0.0.0', () => {
     console.log('Dev: open http://localhost:3000 (Vite proxies API)');
   }
 });
+
+// Keep Render's free tier awake by pinging our own public URL.
+// Set KEEP_ALIVE_URL to the live site (e.g. https://qr-horn.onrender.com).
+// An external monitor (UptimeRobot) is still recommended — see DEPLOY.md.
+const keepAliveUrl = process.env.KEEP_ALIVE_URL?.trim();
+if (isProd && keepAliveUrl) {
+  const ping = async () => {
+    try {
+      await fetch(`${keepAliveUrl.replace(/\/$/, '')}/api/health`);
+    } catch {
+      // network hiccup — next ping will retry
+    }
+  };
+  setInterval(ping, 10 * 60 * 1000);
+  console.log(`Keep-alive ping enabled → ${keepAliveUrl}/api/health every 10 min`);
+}

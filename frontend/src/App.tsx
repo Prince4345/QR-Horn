@@ -12,9 +12,12 @@ import { parseScanCodeFromPath } from './lib/scanUrl';
 
 function getInitialState() {
   const code = parseScanCodeFromPath(window.location.pathname);
+  // Push notifications deep-link owners straight to the dashboard
+  const wantsDashboard =
+    !code && new URLSearchParams(window.location.search).get('view') === 'dashboard';
   return {
     scanCode: code ?? undefined,
-    view: 'scanner' as 'scanner' | 'dashboard',
+    view: (wantsDashboard ? 'dashboard' : 'scanner') as 'scanner' | 'dashboard',
   };
 }
 
@@ -37,6 +40,19 @@ export default function App() {
     window.addEventListener('popstate', syncFromUrl);
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, [syncFromUrl]);
+
+  // Notification tap on an already-open tab → jump to the dashboard
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'qrhorn:open-dashboard') {
+        setView('dashboard');
+        setScanCode(undefined);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
+  }, []);
 
   const openDashboard = () => {
     setView('dashboard');

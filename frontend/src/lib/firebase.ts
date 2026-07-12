@@ -64,9 +64,12 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
 
     if (!onMessageBound) {
       onMessage(messaging, (payload) => {
-        const title = payload.notification?.title ?? 'QRHorn';
-        const body = payload.notification?.body ?? 'New vehicle contact';
-        if (Notification.permission === 'granted') {
+        const data = payload.data ?? {};
+        const title = data.title ?? payload.notification?.title ?? 'QRHorn';
+        const body = data.body ?? payload.notification?.body ?? 'New vehicle contact';
+        // Incoming calls already ring in-app (CallContext); only show a
+        // notification for non-call alerts while the tab is in foreground.
+        if (data.kind !== 'call' && Notification.permission === 'granted') {
           new Notification(title, { body });
         }
         window.dispatchEvent(new CustomEvent('qrhorn:ping'));

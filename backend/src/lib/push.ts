@@ -37,7 +37,7 @@ function isInvalidFcmToken(err: unknown): boolean {
 
 export async function sendPushToOwner(
   ownerId: string,
-  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean }
+  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean; kind?: 'notify' | 'call' }
 ): Promise<boolean> {
   if (!initFirebase()) {
     console.warn('Firebase not configured — push notification skipped');
@@ -57,18 +57,36 @@ export async function sendPushToOwner(
     return false;
   }
 
-  const title = payload.theftMode ? '⚠ Theft Alert' : 'Vehicle Contact';
-  const body = `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
+  const isCall = payload.kind === 'call';
+  const title = isCall
+    ? `📞 Incoming call — ${payload.vehicleName}`
+    : payload.theftMode
+      ? '⚠ Theft Alert'
+      : 'Vehicle Contact';
+  const body = isCall
+    ? `Someone at ${payload.vehicleNumber} wants to talk. Tap to answer.`
+    : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
   let anySent = false;
 
   for (const token of tokenSet) {
     try {
+      // Data-only message: the service worker displays it (avoids duplicate
+      // notifications) and handles clicks to open the dashboard.
       await admin.messaging().send({
         token,
-        notification: { title, body },
+        data: {
+          title,
+          body,
+          kind: payload.kind ?? 'notify',
+          url: '/?view=dashboard',
+        },
         webpush: {
-          fcmOptions: { link: '/' },
+          headers: {
+            Urgency: 'high',
+            // A ring is pointless after the 60s timeout; alerts can wait longer
+            TTL: isCall ? '60' : '3600',
+          },
         },
       });
       anySent = true;

@@ -130,6 +130,30 @@ QR codes embed `VITE_APP_URL`. After deploy:
 1. Open the dashboard on the **live** site.
 2. Re-download PNG/PDF stickers so codes point to production, not `localhost`.
 
+## Keep the free tier awake (recommended)
+
+Render's free plan sleeps after ~15 min without traffic, so the first scan of the day
+is slow (~30s wake-up) and incoming calls can miss their window. Two fixes — use both:
+
+**A. UptimeRobot (external, most reliable):**
+
+1. Sign up free at [uptimerobot.com](https://uptimerobot.com).
+2. **Add New Monitor** → type **HTTP(s)**.
+3. URL: `https://your-app.onrender.com/api/health`
+4. Interval: **5 minutes** → Save.
+
+You also get downtime email alerts for free.
+
+**B. Self-ping (built-in):**
+
+Set one more env var on Render and redeploy:
+
+| Variable | Value |
+|----------|-------|
+| `KEEP_ALIVE_URL` | `https://your-app.onrender.com` |
+
+The server then pings its own `/api/health` every 10 minutes.
+
 ## Custom domain (optional)
 
 1. Render → your service → **Settings → Custom Domains**.
