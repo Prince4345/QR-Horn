@@ -7,8 +7,13 @@ import { isVoiceConfigured } from '../lib/calls.js';
 import { isGeminiConfigured } from '../lib/gemini.js';
 import { getPendingCalls } from '../lib/voiceRooms.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { formatE164 } from '../lib/phone.js';
 
 const router = Router();
+
+function isProfileComplete(owner: { name: string | null; phone: string | null } | null): boolean {
+  return !!(owner?.name?.trim() && owner?.phone?.trim());
+}
 
 router.get('/config', (_req, res) => {
   res.json({
@@ -52,7 +57,12 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
       select: { id: true, name: true, email: true, phone: true, fcmToken: true },
     });
 
-    res.json({ setupComplete: true, owner });
+    // Existing Google/phone users with incomplete profiles must finish name + phone
+    res.json({
+      setupComplete: isProfileComplete(owner),
+      owner: owner ?? undefined,
+      authUserId: req.authUserId,
+    });
   } catch (error) {
     console.error('GET /api/auth/me:', error);
     res.status(500).json({ error: 'Failed to fetch profile' });
@@ -67,6 +77,12 @@ router.post('/setup', requireAuth, async (req: AuthRequest, res) => {
     }
 
     const { name, phone } = req.body as { name?: string; phone?: string };
+    const displayName = name?.trim();
+    if (!displayName) {
+      res.status(400).json({ error: 'Name is required' });
+      return;
+    }
+
     const { data: userData } = await supabaseAdmin.auth.admin.getUserById(req.authUserId!);
     const user = userData.user;
 
@@ -74,12 +90,12 @@ router.post('/setup', requireAuth, async (req: AuthRequest, res) => {
       user?.email ??
       (user?.phone ? `${user.phone.replace(/\D/g, '')}@phone.qrhorn.app` : `${req.authUserId}@phone.qrhorn.app`);
 
-    const userPhone = phone?.trim() || user?.phone || null;
-    const displayName =
-      name?.trim() ||
-      user?.user_metadata?.full_name ||
-      user?.user_metadata?.name ||
-      email.split('@')[0];
+    const rawPhone = phone?.trim() || user?.phone || '';
+    const userPhone = formatE164(rawPhone);
+    if (!userPhone) {
+      res.status(400).json({ error: 'A valid mobile number is required for SMS alerts' });
+      return;
+    }
 
     const owner = await prisma.owner.upsert({
       where: { authUserId: req.authUserId! },
@@ -90,8 +106,8 @@ router.post('/setup', requireAuth, async (req: AuthRequest, res) => {
         phone: userPhone,
       },
       update: {
-        ...(name?.trim() && { name: name.trim() }),
-        ...(phone !== undefined && { phone: phone?.trim() || userPhone }),
+        name: displayName,
+        phone: userPhone,
       },
     });
 
