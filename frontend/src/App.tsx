@@ -57,29 +57,31 @@ export default function App() {
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* Public scanner only — never float this over the owner dashboard / sticker studio */}
-      {view === 'scanner' && (
-        <div className="fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
-          <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-1 pointer-events-auto">
-            <button
-              onClick={openScanner}
-              className="px-4 py-1.5 rounded-full text-sm font-medium bg-white/10 text-white flex items-center gap-2"
-            >
-              <QrCode className="w-4 h-4" />
-              Scanner
-            </button>
-            <button
-              onClick={openDashboard}
-              className="px-4 py-1.5 rounded-full text-sm font-medium text-slate-400 hover:text-white flex items-center gap-2"
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Owner login
-            </button>
-          </div>
+      {/* App navigation — switch between public scanner and owner dashboard */}
+      <div className="fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-1 pointer-events-auto">
+          <button
+            onClick={openScanner}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 transition-colors ${
+              view === 'scanner' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            Scanner
+          </button>
+          <button
+            onClick={openDashboard}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 transition-colors ${
+              view === 'dashboard' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            Owner dashboard
+          </button>
         </div>
-      )}
+      </div>
 
-      <main className={`${view === 'scanner' ? 'pt-20' : 'pt-6'} pb-12 px-4 min-h-screen flex flex-col items-center`}>
+      <main className="pt-20 pb-12 px-4 min-h-screen flex flex-col items-center">
         <div className={view === 'scanner' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'scanner'}>
           <ScannerView scanCode={scanCode} />
         </div>
