@@ -91,14 +91,50 @@ function getSocket(): Socket {
   return sharedSocket;
 }
 
-function joinRoom(socket: Socket, roomId: string): Promise<JoinAck> {
+/** Resolve once the socket is truly connected (handles Render cold starts). */
+function ensureConnected(socket: Socket, timeoutMs = 20000): Promise<void> {
+  if (socket.connected) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Could not join call room')), 10000);
+    const t = setTimeout(() => {
+      socket.off('connect', onConnect);
+      reject(new Error('Could not connect to call server'));
+    }, timeoutMs);
+    const onConnect = () => {
+      clearTimeout(t);
+      socket.off('connect', onConnect);
+      resolve();
+    };
+    socket.on('connect', onConnect);
+    socket.connect();
+  });
+}
+
+function joinOnce(socket: Socket, roomId: string, timeoutMs: number): Promise<JoinAck> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('Could not join call room'));
+    }, timeoutMs);
     socket.emit('call:join', { roomId }, (res: JoinAck) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolve(res ?? { ok: false, reason: 'not_found' });
     });
   });
+}
+
+async function joinRoom(socket: Socket, roomId: string): Promise<JoinAck> {
+  await ensureConnected(socket);
+  try {
+    return await joinOnce(socket, roomId, 12000);
+  } catch {
+    // Ack can be lost if the socket reconnected mid-flight — retry once.
+    await ensureConnected(socket);
+    return joinOnce(socket, roomId, 12000);
+  }
 }
 
 /** Turn a getUserMedia error into a clear, accurate message. */
