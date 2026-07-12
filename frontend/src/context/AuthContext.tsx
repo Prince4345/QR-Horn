@@ -10,6 +10,7 @@ export interface OwnerProfile {
   email: string;
   phone: string | null;
   fcmToken: string | null;
+  createdAt?: string;
 }
 
 interface AuthContextValue {

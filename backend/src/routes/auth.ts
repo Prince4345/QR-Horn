@@ -55,7 +55,7 @@ router.get('/me', requireAuth, async (req: AuthRequest, res) => {
 
     const owner = await prisma.owner.findUnique({
       where: { id: req.ownerId },
-      select: { id: true, name: true, email: true, phone: true, fcmToken: true },
+      select: { id: true, name: true, email: true, phone: true, fcmToken: true, createdAt: true },
     });
 
     // Existing Google/phone users with incomplete profiles must finish name + phone
@@ -116,6 +116,56 @@ router.post('/setup', requireAuth, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('POST /api/auth/setup:', error);
     res.status(500).json({ error: 'Failed to setup account' });
+  }
+});
+
+router.patch('/profile', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    if (!req.ownerId) {
+      res.status(403).json({ error: 'Complete account setup first' });
+      return;
+    }
+
+    const { name, phone } = req.body as { name?: string; phone?: string };
+    const data: { name?: string; phone?: string } = {};
+
+    if (name !== undefined) {
+      const displayName = name.trim();
+      if (!displayName) {
+        res.status(400).json({ error: 'Name cannot be empty' });
+        return;
+      }
+      if (displayName.length > 80) {
+        res.status(400).json({ error: 'Name is too long' });
+        return;
+      }
+      data.name = displayName;
+    }
+
+    if (phone !== undefined) {
+      const formatted = formatE164(phone.trim());
+      if (!formatted) {
+        res.status(400).json({ error: 'Enter a valid mobile number (e.g. +91 98765 43210)' });
+        return;
+      }
+      data.phone = formatted;
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'Nothing to update' });
+      return;
+    }
+
+    const owner = await prisma.owner.update({
+      where: { id: req.ownerId },
+      data,
+      select: { id: true, name: true, email: true, phone: true, fcmToken: true, createdAt: true },
+    });
+
+    res.json({ owner });
+  } catch (error) {
+    console.error('PATCH /api/auth/profile:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 

@@ -26,6 +26,7 @@ import { useAuth } from '../context/AuthContext';
 import AuthPage from './AuthPage';
 import AddVehicleModal from './AddVehicleModal';
 import EditVehicleModal from './EditVehicleModal';
+import ProfileModal from './ProfileModal';
 import StickerStudio from './StickerStudio';
 import {
   DEFAULT_STICKER_CUSTOMIZATION,
@@ -149,6 +150,7 @@ function DashboardContent({ isActive = true }: DashboardProps) {
   const [showSticker, setShowSticker] = useState(false);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showEditVehicle, setShowEditVehicle] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [themeId, setThemeId] = useState('default');
   const [customImage, setCustomImage] = useState<string | null>(null);
@@ -431,9 +433,14 @@ function DashboardContent({ isActive = true }: DashboardProps) {
               Enable Push Notifications
             </button>
           )}
-          <button onClick={signOut} className="mt-6 text-sm text-slate-500 hover:text-white flex items-center gap-1 mx-auto">
-            <LogOut className="w-4 h-4" /> Sign out
-          </button>
+          <div className="mt-6 flex items-center justify-center gap-6">
+            <button onClick={() => setShowProfile(true)} className="text-sm text-slate-500 hover:text-white flex items-center gap-1">
+              <Pencil className="w-4 h-4" /> Profile
+            </button>
+            <button onClick={signOut} className="text-sm text-slate-500 hover:text-white flex items-center gap-1">
+              <LogOut className="w-4 h-4" /> Sign out
+            </button>
+          </div>
         </div>
         {showAddVehicle && (
           <AddVehicleModal
@@ -441,6 +448,7 @@ function DashboardContent({ isActive = true }: DashboardProps) {
             onAdded={loadVehicles}
           />
         )}
+        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
       </>
     );
   }
@@ -568,8 +576,20 @@ function DashboardContent({ isActive = true }: DashboardProps) {
                         {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
                       </button>
                     )}
-                    <button onClick={signOut} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1">
-                      <LogOut className="w-4 h-4" />
+                    <button
+                      onClick={() => setShowProfile(true)}
+                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2"
+                      title="Your profile"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold">
+                        {(owner?.name ?? '?')
+                          .trim()
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w[0]?.toUpperCase() ?? '')
+                          .join('')}
+                      </span>
+                      Profile
                     </button>
                     <button onClick={() => setShowSticker(true)} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors flex items-center gap-2">
                       <QrCode className="w-4 h-4" /> Get Sticker
@@ -683,6 +703,7 @@ function DashboardContent({ isActive = true }: DashboardProps) {
         onSaved={() => loadVehicles()}
       />
     )}
+    {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
     </>
   );
 }

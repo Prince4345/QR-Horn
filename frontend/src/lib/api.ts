@@ -97,6 +97,7 @@ export interface OwnerProfile {
   email: string;
   phone: string | null;
   fcmToken: string | null;
+  createdAt?: string;
 }
 
 export type ContactMethod = 'qr' | 'plate';
@@ -122,6 +123,12 @@ export const api = {
     request<{ setupComplete: boolean; owner: OwnerProfile }>('/api/auth/setup', {
       method: 'POST',
       body: JSON.stringify({ name, phone }),
+    }),
+
+  updateProfile: (data: { name?: string; phone?: string }) =>
+    request<{ owner: OwnerProfile }>('/api/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 
   saveFcmToken: (fcmToken: string, device?: string) =>
