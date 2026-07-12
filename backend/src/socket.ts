@@ -39,11 +39,15 @@ export function initSocketServer(httpServer: HttpServer) {
     pingInterval: 15000,
   });
 
-  // Ringing timeout → notify anyone already in the voice room
+  // Ringing timeout → notify anyone already in the voice room AND every
+  // owner device (most owner devices never join the voice room until they
+  // accept, so without this they'd ring forever).
   setRoomExpireHandler((roomId, reason) => {
     clearSignals(roomId);
     const event = reason === 'expired' ? 'call:declined' : 'call:ended';
+    const room = getJoinableRoom(roomId);
     io?.to(`voice:${roomId}`).emit(event, { roomId, reason });
+    if (room) io?.to(`owner:${room.ownerId}`).emit(event, { roomId, reason });
   });
 
   // Terminal room state → write outcome + duration to call history
@@ -98,22 +102,23 @@ export function initSocketServer(httpServer: HttpServer) {
       setVoiceRoomStatus(roomId!, 'active');
       clearPendingCall(room.ownerId, roomId!);
       io!.to(`voice:${roomId}`).emit('call:accepted', { roomId });
+      // Tell every owner device (e.g. one that's still ringing on another
+      // phone/tab) that this call is being handled elsewhere.
+      io!.to(`owner:${room.ownerId}`).emit('call:accepted', { roomId });
     });
 
     socket.on('call:decline', ({ roomId }: { roomId?: string }) => {
       if (!roomId) return;
-      const room = getJoinableRoom(roomId);
-      if (room) clearPendingCall(room.ownerId, roomId);
-      endVoiceRoom(roomId, 'declined');
-      clearSignals(roomId);
-      io!.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });
+      declineCallByRoom(roomId);
     });
 
     socket.on('call:end', ({ roomId }: { roomId?: string }) => {
       if (!roomId) return;
+      const room = getJoinableRoom(roomId);
       endVoiceRoom(roomId, 'ended');
       clearSignals(roomId);
       io!.to(`voice:${roomId}`).emit('call:ended', { roomId, reason: 'ended' });
+      if (room) io!.to(`owner:${room.ownerId}`).emit('call:ended', { roomId, reason: 'ended' });
     });
 
     socket.on('webrtc:offer', ({ roomId, offer }: { roomId?: string; offer?: object }) => {
@@ -141,6 +146,22 @@ export function initSocketServer(httpServer: HttpServer) {
 export function getIO() {
   if (!io) throw new Error('Socket.io not initialized');
   return io;
+}
+
+/**
+ * Decline a ringing call by roomId. Shared by the socket handler and the
+ * public HTTP endpoint (used by the "Decline" action on the OS notification,
+ * which can fire even while the app is fully closed).
+ */
+export function declineCallByRoom(roomId: string): boolean {
+  const room = getJoinableRoom(roomId);
+  if (!room || room.status !== 'ringing') return false;
+  clearPendingCall(room.ownerId, roomId);
+  endVoiceRoom(roomId, 'declined');
+  clearSignals(roomId);
+  io?.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });
+  io?.to(`owner:${room.ownerId}`).emit('call:declined', { roomId, reason: 'declined' });
+  return true;
 }
 
 export function emitIncomingCall(

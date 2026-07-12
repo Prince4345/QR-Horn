@@ -7,6 +7,7 @@ export interface OwnerAlertPayload {
   vehicleNumber: string;
   theftMode: boolean;
   kind?: 'notify' | 'call';
+  roomId?: string;
 }
 
 export interface OwnerAlertResult {

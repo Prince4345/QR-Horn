@@ -18,26 +18,45 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
-  const data = payload.data ?? {};
-  const title = data.title ?? payload.notification?.title ?? 'QRHorn';
-  const body = data.body ?? payload.notification?.body ?? 'New vehicle contact';
+function showCallOrAlert(data) {
   const isCall = data.kind === 'call';
-
-  self.registration.showNotification(title, {
-    body,
+  return self.registration.showNotification(data.title ?? 'QRHorn', {
+    body: data.body ?? 'New vehicle contact',
     tag: isCall ? 'qrhorn-call' : 'qrhorn-alert',
     renotify: isCall,
     requireInteraction: isCall,
     vibrate: isCall ? [400, 200, 400, 200, 400] : [200],
-    data: { url: data.url ?? '/?view=dashboard' },
-    actions: isCall ? [{ action: 'answer', title: 'Answer' }] : [],
+    data: { url: data.url ?? '/?view=dashboard', roomId: data.roomId ?? null },
+    actions: isCall
+      ? [
+          { action: 'answer', title: '✅ Answer' },
+          { action: 'decline', title: '✖️ Decline' },
+        ]
+      : [],
   });
+}
+
+messaging.onBackgroundMessage((payload) => {
+  showCallOrAlert(payload.data ?? {});
 });
 
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
+  const roomId = event.notification.data?.roomId;
   const url = event.notification.data?.url ?? '/?view=dashboard';
+
+  if (event.action === 'decline' && roomId) {
+    event.notification.close();
+    // Decline directly from the service worker — works even if the app
+    // (and its in-memory auth token) is fully closed. See routes/calls.ts.
+    event.waitUntil(
+      fetch(`${self.location.origin}/api/calls/${encodeURIComponent(roomId)}/decline`, {
+        method: 'POST',
+      }).catch(() => {})
+    );
+    return;
+  }
+
+  event.notification.close();
 
   event.waitUntil(
     (async () => {

@@ -1,0 +1,14 @@
+Fix cross-device call sync + real OS call popup with Answer/Decline
+
+Declining/accepting on one owner device never reached other devices
+(phone/PC) because accept/decline/end/expire were only broadcast to the
+call's own signaling room, which non-participating devices never join
+until they accept. Now also broadcast to the owner's device room, and
+have the frontend subscribe to that directly instead of relying solely
+on a poll that was paused the whole time a call was ringing.
+
+Also give incoming calls a real OS notification (not just the in-app
+ringtone) whenever the tab isn't actually visible - including a
+Decline action that hits a new public /api/calls/:roomId/decline
+endpoint straight from the service worker, so it works even with the
+app fully closed.

@@ -5,6 +5,7 @@ import cors from 'cors';
 import vehiclesRouter from './routes/vehicles.js';
 import scanRouter from './routes/scan.js';
 import authRouter from './routes/auth.js';
+import callsRouter from './routes/calls.js';
 import { attachFrontend } from './serveFrontend.js';
 import { prisma } from './lib/prisma.js';
 import { initSocketServer } from './socket.js';
@@ -46,6 +47,7 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/scan', scanRouter);
+app.use('/api/calls', callsRouter);
 
 if (isProd) {
   attachFrontend(app);

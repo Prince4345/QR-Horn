@@ -107,7 +107,14 @@ async function sendDataToOwnerDevices(
 
 export async function sendPushToOwner(
   ownerId: string,
-  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean; kind?: 'notify' | 'call' }
+  payload: {
+    reason: string;
+    vehicleName: string;
+    vehicleNumber: string;
+    theftMode: boolean;
+    kind?: 'notify' | 'call';
+    roomId?: string;
+  }
 ): Promise<boolean> {
   const isCall = payload.kind === 'call';
   const title = isCall
@@ -119,14 +126,17 @@ export async function sendPushToOwner(
     ? `Someone at ${payload.vehicleNumber} wants to talk. Tap to answer.`
     : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
+  const data: Record<string, string> = {
+    title,
+    body,
+    kind: payload.kind ?? 'notify',
+    url: '/?view=dashboard',
+  };
+  if (payload.roomId) data.roomId = payload.roomId;
+
   const result = await sendDataToOwnerDevices(
     ownerId,
-    {
-      title,
-      body,
-      kind: payload.kind ?? 'notify',
-      url: '/?view=dashboard',
-    },
+    data,
     // A ring is pointless after the 60s timeout; alerts can wait longer
     isCall ? 60 : 3600
   );

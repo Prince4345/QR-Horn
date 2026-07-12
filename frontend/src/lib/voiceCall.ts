@@ -600,3 +600,29 @@ export function subscribeIncomingCalls(cb: (call: IncomingCall) => void) {
 export function declineIncomingCall(roomId: string) {
   getSocket().emit('call:decline', { roomId });
 }
+
+export type CallLifecycleEvent = { roomId: string; type: 'accepted' | 'declined' | 'ended' };
+
+/**
+ * Cross-device call state (accept/decline/end), broadcast to every device
+ * registered as this owner — not scoped to a single VoiceCallSession. Lets a
+ * ringing device learn the call was handled (or dropped) on another device,
+ * even if it never joined the call's own signaling room.
+ */
+export function subscribeCallLifecycle(cb: (evt: CallLifecycleEvent) => void) {
+  const socket = getSocket();
+  const make = (type: CallLifecycleEvent['type']) => (p: { roomId?: string } = {}) => {
+    if (p.roomId) cb({ roomId: p.roomId, type });
+  };
+  const onAccepted = make('accepted');
+  const onDeclined = make('declined');
+  const onEnded = make('ended');
+  socket.on('call:accepted', onAccepted);
+  socket.on('call:declined', onDeclined);
+  socket.on('call:ended', onEnded);
+  return () => {
+    socket.off('call:accepted', onAccepted);
+    socket.off('call:declined', onDeclined);
+    socket.off('call:ended', onEnded);
+  };
+}

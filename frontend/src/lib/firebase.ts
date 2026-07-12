@@ -69,9 +69,35 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
         const data = payload.data ?? {};
         const title = data.title ?? payload.notification?.title ?? 'QRHorn';
         const body = data.body ?? payload.notification?.body ?? 'New vehicle contact';
-        // Incoming calls already ring in-app (CallContext); only show a
-        // notification for non-call alerts while the tab is in foreground.
-        if (data.kind !== 'call' && Notification.permission === 'granted') {
+        const isCall = data.kind === 'call';
+        // "Foreground" per FCM just means the tab's JS is alive — that still
+        // happens while the screen is off/another app is in front. In that
+        // case the in-app ring (CallContext) is invisible, so surface a real
+        // OS notification with Answer/Decline actions, same as the SW path.
+        const tabHidden = document.visibilityState !== 'visible';
+
+        if (isCall && tabHidden) {
+          // TS's lib.dom NotificationOptions predates several spec fields
+          // (renotify/vibrate/actions) that are well-supported and used by
+          // the service worker's showNotification calls too.
+          const options = {
+            body,
+            tag: 'qrhorn-call',
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [400, 200, 400, 200, 400],
+            data: { url: data.url ?? '/?view=dashboard', roomId: data.roomId ?? null },
+            actions: [
+              { action: 'answer', title: '✅ Answer' },
+              { action: 'decline', title: '✖️ Decline' },
+            ],
+          } as NotificationOptions;
+          (swRegistration ? Promise.resolve(swRegistration) : navigator.serviceWorker.ready).then((reg) => {
+            reg.showNotification(title, options);
+          });
+        } else if (!isCall && Notification.permission === 'granted') {
+          // Incoming calls that ARE visible already ring in-app; only
+          // non-call alerts get a plain notification while foreground.
           new Notification(title, { body });
         }
         window.dispatchEvent(new CustomEvent('qrhorn:ping'));

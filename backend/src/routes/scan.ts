@@ -209,6 +209,7 @@ router.post('/by-number/:number/call', async (req, res) => {
       vehicleNumber: vehicle.number,
       theftMode: vehicle.theftMode,
       kind: 'call',
+      roomId,
     });
 
     const callId = await recordCall(vehicle.id, 'CONNECTING');
@@ -317,6 +318,7 @@ router.post('/:code/call', async (req, res) => {
       vehicleNumber: vehicle.number,
       theftMode: vehicle.theftMode,
       kind: 'call',
+      roomId,
     });
 
     const callId = await recordCall(vehicle.id, 'CONNECTING');
