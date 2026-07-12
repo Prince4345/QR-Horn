@@ -2,9 +2,11 @@ import type { Server as HttpServer } from 'http';
 import { Server, type Socket } from 'socket.io';
 import {
   endVoiceRoom,
+  getJoinableRoom,
   getVoiceRoom,
   setVoiceRoomStatus,
   clearPendingCall,
+  setRoomExpireHandler,
 } from './lib/voiceRooms.js';
 import {
   bufferOffer,
@@ -16,36 +18,69 @@ import {
 
 let io: Server | null = null;
 
+type JoinAck = {
+  ok: boolean;
+  status?: string;
+  reason?: 'not_found' | 'ended' | 'declined' | 'expired' | 'active' | 'ringing';
+};
+
 export function initSocketServer(httpServer: HttpServer) {
   const corsEnv = process.env.CORS_ORIGIN?.trim();
   const origins = corsEnv
     ? corsEnv.split(',').map((o) => o.trim()).filter(Boolean)
-    : ['http://localhost:3000'];
+    : true;
 
   io = new Server(httpServer, {
-    cors: { origin: origins.length ? origins : true, methods: ['GET', 'POST'] },
+    cors: { origin: origins, methods: ['GET', 'POST'] },
+    pingTimeout: 30000,
+    pingInterval: 15000,
+  });
+
+  // Ringing timeout → notify anyone already in the voice room
+  setRoomExpireHandler((roomId, reason) => {
+    clearSignals(roomId);
+    const event = reason === 'expired' ? 'call:declined' : 'call:ended';
+    io?.to(`voice:${roomId}`).emit(event, { roomId, reason });
   });
 
   io.on('connection', (socket: Socket) => {
     socket.on('owner:register', ({ ownerId }: { ownerId?: string }) => {
-      if (!ownerId) return;
+      if (!ownerId || typeof ownerId !== 'string') return;
       socket.join(`owner:${ownerId}`);
     });
 
-    socket.on('call:join', (payload: { roomId?: string }, ack?: (r: { ok: boolean }) => void) => {
+    socket.on('call:join', (payload: { roomId?: string }, ack?: (r: JoinAck) => void) => {
       const roomId = payload?.roomId;
-      if (!roomId || !getVoiceRoom(roomId)) {
-        ack?.({ ok: false });
+      if (!roomId) {
+        ack?.({ ok: false, reason: 'not_found' });
         return;
       }
+
+      const room = getJoinableRoom(roomId);
+      if (!room) {
+        ack?.({ ok: false, reason: 'not_found' });
+        return;
+      }
+
+      if (room.status === 'ended' || room.status === 'declined' || room.status === 'expired') {
+        ack?.({ ok: false, status: room.status, reason: room.status });
+        // Still join briefly so they can receive any last events, but report failure
+        socket.join(`voice:${roomId}`);
+        socket.emit(room.status === 'declined' || room.status === 'expired' ? 'call:declined' : 'call:ended', {
+          roomId,
+          reason: room.status,
+        });
+        return;
+      }
+
       socket.join(`voice:${roomId}`);
       replaySignalsToSocket(socket, roomId);
-      ack?.({ ok: true });
+      ack?.({ ok: true, status: room.status, reason: room.status });
     });
 
     socket.on('call:accept', ({ roomId }: { roomId?: string }) => {
       const room = roomId ? getVoiceRoom(roomId) : null;
-      if (!room) return;
+      if (!room || room.status !== 'ringing') return;
       setVoiceRoomStatus(roomId!, 'active');
       clearPendingCall(room.ownerId, roomId!);
       io!.to(`voice:${roomId}`).emit('call:accepted', { roomId });
@@ -53,34 +88,34 @@ export function initSocketServer(httpServer: HttpServer) {
 
     socket.on('call:decline', ({ roomId }: { roomId?: string }) => {
       if (!roomId) return;
-      const room = getVoiceRoom(roomId);
+      const room = getJoinableRoom(roomId);
       if (room) clearPendingCall(room.ownerId, roomId);
-      endVoiceRoom(roomId);
+      endVoiceRoom(roomId, 'declined');
       clearSignals(roomId);
-      io!.to(`voice:${roomId}`).emit('call:declined', { roomId });
+      io!.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });
     });
 
     socket.on('call:end', ({ roomId }: { roomId?: string }) => {
       if (!roomId) return;
-      endVoiceRoom(roomId);
+      endVoiceRoom(roomId, 'ended');
       clearSignals(roomId);
-      io!.to(`voice:${roomId}`).emit('call:ended', { roomId });
+      io!.to(`voice:${roomId}`).emit('call:ended', { roomId, reason: 'ended' });
     });
 
     socket.on('webrtc:offer', ({ roomId, offer }: { roomId?: string; offer?: object }) => {
-      if (!roomId || !offer) return;
+      if (!roomId || !offer || !getVoiceRoom(roomId)) return;
       bufferOffer(roomId, offer);
       socket.to(`voice:${roomId}`).emit('webrtc:offer', { roomId, offer });
     });
 
     socket.on('webrtc:answer', ({ roomId, answer }: { roomId?: string; answer?: object }) => {
-      if (!roomId || !answer) return;
+      if (!roomId || !answer || !getVoiceRoom(roomId)) return;
       bufferAnswer(roomId, answer);
       socket.to(`voice:${roomId}`).emit('webrtc:answer', { roomId, answer });
     });
 
     socket.on('webrtc:ice', ({ roomId, candidate }: { roomId?: string; candidate?: object }) => {
-      if (!roomId || !candidate) return;
+      if (!roomId || !candidate || !getVoiceRoom(roomId)) return;
       bufferIce(roomId, candidate);
       socket.to(`voice:${roomId}`).emit('webrtc:ice', { roomId, candidate });
     });

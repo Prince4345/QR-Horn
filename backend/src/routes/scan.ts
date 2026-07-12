@@ -190,13 +190,18 @@ router.post('/by-number/:number/call', async (req, res) => {
     if (!enforceRateLimit(res, clientIp(req), vehicle.id)) return;
 
     const roomId = nanoid(12);
-    createVoiceRoom({
+    const created = createVoiceRoom({
       vehicleId: vehicle.id,
       ownerId: vehicle.ownerId,
       vehicleName: vehicle.name,
       vehicleNumber: vehicle.number,
       roomId,
     });
+
+    if (created.error || !created.room) {
+      res.status(409).json({ error: created.error ?? 'Owner is already on a call. Try again in a moment.' });
+      return;
+    }
 
     const alert = await sendOwnerAlert(vehicle.ownerId, {
       reason: 'call',
@@ -292,13 +297,18 @@ router.post('/:code/call', async (req, res) => {
     if (!enforceRateLimit(res, clientIp(req), vehicle.id)) return;
 
     const roomId = nanoid(12);
-    createVoiceRoom({
+    const created = createVoiceRoom({
       vehicleId: vehicle.id,
       ownerId: vehicle.ownerId,
       vehicleName: vehicle.name,
       vehicleNumber: vehicle.number,
       roomId,
     });
+
+    if (created.error || !created.room) {
+      res.status(409).json({ error: created.error ?? 'Owner is already on a call. Try again in a moment.' });
+      return;
+    }
 
     const alert = await sendOwnerAlert(vehicle.ownerId, {
       reason: 'call',
