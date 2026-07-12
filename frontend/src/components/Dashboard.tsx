@@ -90,11 +90,10 @@ function PhoneAlertsBanner({
 }
 
 interface DashboardProps {
-  onOpenScan: (code: string) => void;
   isActive?: boolean;
 }
 
-export default function Dashboard({ onOpenScan, isActive = true }: DashboardProps) {
+export default function Dashboard({ isActive = true }: DashboardProps) {
   const { session, setupComplete, profileLoading, owner, authError, refreshProfile, signOut, clearAuthError } = useAuth();
 
   if (profileLoading && !owner && !authError) {
@@ -137,10 +136,10 @@ export default function Dashboard({ onOpenScan, isActive = true }: DashboardProp
     return <AuthPage />;
   }
 
-  return <DashboardContent onOpenScan={onOpenScan} isActive={isActive} />;
+  return <DashboardContent isActive={isActive} />;
 }
 
-function DashboardContent({ onOpenScan, isActive = true }: DashboardProps) {
+function DashboardContent({ isActive = true }: DashboardProps) {
   const { owner, signOut, enablePushNotifications, preparePushNotifications, pushEnabled } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -633,10 +632,16 @@ function DashboardContent({ onOpenScan, isActive = true }: DashboardProps) {
                   />
                   <div className="flex flex-wrap items-center gap-3 mt-4 justify-center">
                     <button
-                      onClick={() => onOpenScan(selectedVehicle.stickerCode!)}
+                      onClick={() =>
+                        window.open(
+                          `${window.location.origin}/scan/${encodeURIComponent(selectedVehicle.stickerCode!)}`,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
                       className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
                     >
-                      <ExternalLink className="w-4 h-4" /> Test scan
+                      <ExternalLink className="w-4 h-4" /> Open public scan page
                     </button>
                     <button
                       onClick={handleDownloadPng}
