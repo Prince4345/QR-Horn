@@ -139,6 +139,11 @@ export class VoiceCallSession {
   private onPhaseChange?: (phase: CallPhase) => void;
   private onRemoteStream?: (stream: MediaStream) => void;
   private acceptPromise: Promise<void> | null = null;
+  private acceptResolve: (() => void) | null = null;
+  private acceptReject: ((e: Error) => void) | null = null;
+  private acceptTimeout: ReturnType<typeof setTimeout> | null = null;
+  private acceptHandled = false;
+  private isCaller = false;
   private iceQueue: RTCIceCandidateInit[] = [];
   private remoteSet = false;
   private cleaned = false;
@@ -211,6 +216,32 @@ export class VoiceCallSession {
     }
   };
 
+  // Bound at construction so it catches call:accepted even if the owner
+  // accepts before waitUntilAccepted() attaches (fast-answer race).
+  private onCallAccepted = async ({ roomId: rid }: { roomId?: string } = {}) => {
+    // Only the caller creates the offer; the owner sends the accept and answers.
+    if (!this.isCaller) return;
+    if (rid && rid !== this.roomId) return;
+    if (this.acceptHandled || this.cleaned) return;
+    this.acceptHandled = true;
+    if (this.acceptTimeout) {
+      clearTimeout(this.acceptTimeout);
+      this.acceptTimeout = null;
+    }
+    try {
+      const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
+      await this.pc.setLocalDescription(offer);
+      this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
+      this.setPhase('connecting');
+      this.startConnectWatchdog();
+      this.acceptResolve?.();
+    } catch (err) {
+      this.cleanup();
+      this.setPhase('failed');
+      this.acceptReject?.(err as Error);
+    }
+  };
+
   private onDeclined = ({ roomId: rid }: { roomId: string }) => {
     if (rid !== this.roomId) return;
     this.setPhase('declined');
@@ -246,6 +277,7 @@ export class VoiceCallSession {
 
     const iceServers = await loadIceServers();
     const session = new VoiceCallSession(socket, roomId, iceServers);
+    session.isCaller = true;
     try {
       await session.initLocalAudio();
     } catch (err) {
@@ -267,33 +299,20 @@ export class VoiceCallSession {
     if (this.acceptPromise) return this.acceptPromise;
 
     this.acceptPromise = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.socket.off('call:accepted', onAccepted);
+      // Owner may have accepted before we got here (fast-answer / late join).
+      if (this.acceptHandled) {
+        resolve();
+        return;
+      }
+      this.acceptResolve = resolve;
+      this.acceptReject = reject;
+      this.acceptTimeout = setTimeout(() => {
+        if (this.acceptHandled) return;
         this.socket.emit('call:end', { roomId: this.roomId });
         this.cleanup();
         this.setPhase('failed');
         reject(new Error('Owner did not answer in time'));
       }, timeoutMs);
-
-      const onAccepted = async ({ roomId: rid }: { roomId?: string } = {}) => {
-        if (rid && rid !== this.roomId) return;
-        clearTimeout(timeout);
-        this.socket.off('call:accepted', onAccepted);
-        try {
-          const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
-          await this.pc.setLocalDescription(offer);
-          this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
-          this.setPhase('connecting');
-          this.startConnectWatchdog();
-          resolve();
-        } catch (err) {
-          this.cleanup();
-          this.setPhase('failed');
-          reject(err);
-        }
-      };
-
-      this.socket.on('call:accepted', onAccepted);
     });
 
     return this.acceptPromise;
@@ -430,6 +449,7 @@ export class VoiceCallSession {
     this.socket.on('webrtc:offer', this.onOffer);
     this.socket.on('webrtc:answer', this.onAnswer);
     this.socket.on('webrtc:ice', this.onIce);
+    this.socket.on('call:accepted', this.onCallAccepted);
     this.socket.on('call:declined', this.onDeclined);
     this.socket.on('call:ended', this.onEnded);
     this.socket.io.on('reconnect', this.onReconnect);
@@ -447,6 +467,10 @@ export class VoiceCallSession {
     if (this.cleaned) return;
     this.cleaned = true;
     this.clearConnectWatchdog();
+    if (this.acceptTimeout) {
+      clearTimeout(this.acceptTimeout);
+      this.acceptTimeout = null;
+    }
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
     try {
@@ -459,6 +483,7 @@ export class VoiceCallSession {
     this.socket.off('webrtc:offer', this.onOffer);
     this.socket.off('webrtc:answer', this.onAnswer);
     this.socket.off('webrtc:ice', this.onIce);
+    this.socket.off('call:accepted', this.onCallAccepted);
     this.socket.off('call:declined', this.onDeclined);
     this.socket.off('call:ended', this.onEnded);
     this.socket.io.off('reconnect', this.onReconnect);

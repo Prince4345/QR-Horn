@@ -75,6 +75,11 @@ export function initSocketServer(httpServer: HttpServer) {
 
       socket.join(`voice:${roomId}`);
       replaySignalsToSocket(socket, roomId);
+      // If the owner already accepted before this socket joined (fast-answer
+      // race, or a reconnect), tell it right away so it can send its offer.
+      if (room.status === 'active') {
+        socket.emit('call:accepted', { roomId });
+      }
       ack?.({ ok: true, status: room.status, reason: room.status });
     });
 
