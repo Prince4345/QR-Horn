@@ -95,7 +95,7 @@ export default function StickerStudio({
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }
-    : { background: artPreset.preview };
+    : { background: artPreset.card };
 
   const selectArtStyle = (styleId: (typeof QR_ART_PRESETS)[number]['id']) => {
     const preset = getArtPreset(styleId);
@@ -180,19 +180,25 @@ export default function StickerStudio({
   const visibleSocials = draft.socials.filter((s) => s.handle.trim());
 
   return (
-    <div className="h-full flex flex-col gap-5">
+    <div className="h-full flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
-        <button onClick={onBack} className="text-sm text-slate-400 hover:text-white transition-colors">
+        <button
+          onClick={onBack}
+          className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
+        >
           &larr; Back to details
         </button>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-medium flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-          Save sticker
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:block text-xs text-white/40">Sticker studio</span>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all active:scale-95"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Save sticker
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -200,7 +206,7 @@ export default function StickerStudio({
         <div className="flex flex-col items-center lg:sticky lg:top-2">
           <div
             ref={stickerRef}
-            className="w-[300px] aspect-[3/4] rounded-[28px] shadow-2xl relative overflow-hidden"
+            className="w-[300px] aspect-[3/4] rounded-[28px] shadow-2xl ring-1 ring-white/10 relative overflow-hidden"
             style={cardBackground}
           >
             {/* legibility scrims — keep text readable over any art */}
@@ -302,13 +308,14 @@ export default function StickerStudio({
         </div>
 
         {/* ---------- Controls ---------- */}
-        <div className="space-y-6 text-left max-h-[600px] overflow-y-auto pr-1">
+        <div className="space-y-5 text-left max-h-[640px] overflow-y-auto pr-2 -mr-2 custom-scroll">
           {/* AI design */}
-          <section className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] p-4">
-            <div className="flex items-center gap-2 mb-3">
+          <section className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[0.10] to-fuchsia-500/[0.04] p-5">
+            <div className="flex items-center gap-2 mb-1">
               <Sparkles className="w-4 h-4 text-violet-300" />
               <h3 className="text-sm font-semibold text-white">Design with AI</h3>
             </div>
+            <p className="text-xs text-white/40 mb-4">Upload a photo or describe a look, then generate.</p>
 
             <div className="flex gap-2 mb-3">
               <button
@@ -369,25 +376,31 @@ export default function StickerStudio({
           </section>
 
           {/* Style — connected to Generate */}
-          <section>
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <h3 className="text-sm font-semibold text-white mb-1">Choose a style</h3>
-            <p className="text-xs text-white/40 mb-3">This sets the theme AI designs and the QR look.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <p className="text-xs text-white/40 mb-3">Sets the card theme and QR look.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {QR_ART_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => selectArtStyle(preset.id)}
-                  className={`p-2.5 rounded-2xl border text-left transition-colors ${
+                  className={`group p-2 rounded-2xl border text-left transition-all ${
                     draft.artStyle === preset.id
                       ? 'border-violet-500/70 bg-violet-500/15 ring-1 ring-violet-500/40'
-                      : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      : 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20'
                   }`}
                 >
                   <div
-                    className="w-full h-10 rounded-lg mb-2 border border-white/10"
-                    style={{ background: preset.preview }}
-                  />
+                    className="w-full aspect-[4/3] rounded-xl mb-2 border border-white/10 relative overflow-hidden"
+                    style={{ background: preset.card }}
+                  >
+                    {draft.artStyle === preset.id && (
+                      <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-white text-violet-700 flex items-center justify-center">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs font-medium text-white leading-tight">{preset.name}</p>
                   <p className="text-[10px] text-white/40 leading-tight mt-0.5">{preset.description}</p>
                 </button>
@@ -396,7 +409,7 @@ export default function StickerStudio({
           </section>
 
           {/* Center logo */}
-          <section>
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <h3 className="text-sm font-semibold text-white mb-2">Center logo</h3>
             <p className="text-xs text-white/40 mb-3">
               Upload a small icon for the QR center (car, coffee cup, etc.) — or use the headline letter.
@@ -437,8 +450,8 @@ export default function StickerStudio({
           </section>
 
           {/* Text */}
-          <section>
-            <h3 className="text-sm font-semibold text-white mb-2">Text on sticker</h3>
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+            <h3 className="text-sm font-semibold text-white mb-3">Text on sticker</h3>
             <input
               value={draft.headline}
               onChange={(e) => patch({ headline: e.target.value })}
@@ -456,7 +469,7 @@ export default function StickerStudio({
           </section>
 
           {/* Socials */}
-          <section className="relative z-30">
+          <section className="relative z-30 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-white">Social handles</h3>
               <button
@@ -499,7 +512,7 @@ export default function StickerStudio({
           </section>
 
           {/* QR colors + toggles */}
-          <section className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 flex flex-wrap items-center gap-x-6 gap-y-3">
             <label className="flex items-center gap-2 text-xs text-white/60">
               QR dark
               <input

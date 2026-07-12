@@ -28,6 +28,8 @@ export interface ArtStylePreset {
   moduleShape: 'square' | 'dot' | 'rounded';
   needsPhoto?: boolean;
   preview: string; // gradient for UI swatch
+  /** Rich full-card background gradient for the sticker preview */
+  card: string;
 }
 
 export const QR_ART_PRESETS: ArtStylePreset[] = [
@@ -40,6 +42,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     eyeColor: '#0f172a',
     moduleShape: 'square',
     preview: 'linear-gradient(135deg,#fff 50%,#0f172a 50%)',
+    card: 'linear-gradient(160deg,#1e293b 0%,#0f172a 100%)',
   },
   {
     id: 'dots',
@@ -53,6 +56,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     cornerAccent: true,
     moduleShape: 'dot',
     preview: 'linear-gradient(135deg,#eff6ff,#2563eb,#f59e0b)',
+    card: 'linear-gradient(160deg,#1d4ed8 0%,#0ea5e9 100%)',
   },
   {
     id: 'rounded',
@@ -65,6 +69,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     bgColors: ['#faf5ff', '#f3e8ff'],
     moduleShape: 'rounded',
     preview: 'linear-gradient(135deg,#faf5ff,#7c3aed)',
+    card: 'linear-gradient(160deg,#6d28d9 0%,#a855f7 100%)',
   },
   {
     id: 'luxury-gold',
@@ -77,6 +82,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     bgColors: ['#0a0a0a', '#1c1917'],
     moduleShape: 'dot',
     preview: 'linear-gradient(135deg,#0a0a0a,#c9a227)',
+    card: 'linear-gradient(160deg,#292524 0%,#0a0a0a 100%)',
   },
   {
     id: 'floral',
@@ -90,6 +96,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     cornerAccent: true,
     moduleShape: 'dot',
     preview: 'linear-gradient(135deg,#f5f0e8,#1b4332)',
+    card: 'linear-gradient(160deg,#2d6a4f 0%,#1b4332 100%)',
   },
   {
     id: 'sunset',
@@ -102,6 +109,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     bgColors: ['#fff7ed', '#ffe4e6'],
     moduleShape: 'rounded',
     preview: 'linear-gradient(135deg,#fff7ed,#f97316,#db2777)',
+    card: 'linear-gradient(160deg,#ea580c 0%,#db2777 100%)',
   },
   {
     id: 'neon-pop',
@@ -115,6 +123,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     cornerAccent: true,
     moduleShape: 'dot',
     preview: 'linear-gradient(135deg,#fdf4ff,#d946ef,#facc15)',
+    card: 'linear-gradient(160deg,#c026d3 0%,#7c3aed 100%)',
   },
   {
     id: 'ocean',
@@ -127,6 +136,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     bgColors: ['#e0f4ff', '#cffafe'],
     moduleShape: 'rounded',
     preview: 'linear-gradient(135deg,#e0f4ff,#0077b6)',
+    card: 'linear-gradient(160deg,#0369a1 0%,#0077b6 100%)',
   },
   {
     id: 'coffee',
@@ -140,6 +150,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     cornerAccent: true,
     moduleShape: 'dot',
     preview: 'linear-gradient(135deg,#fefae0,#bc6c25)',
+    card: 'linear-gradient(160deg,#bc6c25 0%,#9c4221 100%)',
   },
   {
     id: 'photo',
@@ -150,6 +161,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     moduleShape: 'square',
     needsPhoto: true,
     preview: 'linear-gradient(135deg,#6366f1,#ec4899)',
+    card: 'linear-gradient(160deg,#4f46e5 0%,#ec4899 100%)',
   },
   {
     id: 'photo-dots',
@@ -160,6 +172,7 @@ export const QR_ART_PRESETS: ArtStylePreset[] = [
     moduleShape: 'dot',
     needsPhoto: true,
     preview: 'linear-gradient(135deg,#22d3ee,#a855f7)',
+    card: 'linear-gradient(160deg,#0891b2 0%,#a855f7 100%)',
   },
 ];
 
