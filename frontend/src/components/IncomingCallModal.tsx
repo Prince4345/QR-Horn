@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Phone, PhoneOff } from 'lucide-react';
 import { useCall } from '../context/CallContext';
+import CallTimer from './CallTimer';
 
 export default function IncomingCallModal() {
   const { incomingCall, callPhase, acceptIncomingCall, declineCall, endActiveCall } = useCall();
@@ -57,7 +58,12 @@ export default function IncomingCallModal() {
                 <h2 className="text-xl font-semibold mb-2">
                   {callPhase === 'connecting' ? 'Connecting...' : 'Call Active'}
                 </h2>
-                <p className="text-white/50 text-sm mb-8">Voice call in progress</p>
+                {callPhase === 'active' ? (
+                  <CallTimer className="block text-3xl text-green-400 mb-2" />
+                ) : null}
+                <p className="text-white/50 text-sm mb-8">
+                  {callPhase === 'active' ? 'Voice call in progress' : 'Setting up secure voice…'}
+                </p>
                 <button
                   onClick={endActiveCall}
                   className="w-full py-3 rounded-2xl bg-red-600 text-white font-semibold flex items-center justify-center gap-2"

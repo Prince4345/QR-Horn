@@ -18,6 +18,7 @@ import {
 import { api, type ContactReason, type ContactMethod, type ScanData } from '../lib/api';
 import { VoiceCallSession, type CallPhase } from '../lib/voiceCall';
 import QrCameraScanner from './QrCameraScanner';
+import CallTimer from './CallTimer';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -431,6 +432,9 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                 <h3 className="text-xl font-medium text-white mb-2">
                   {callPhase === 'active' ? 'Call Connected' : callPhase === 'connecting' ? 'Connecting...' : 'Ringing Owner...'}
                 </h3>
+                {callPhase === 'active' ? (
+                  <CallTimer className="block text-3xl text-green-400 mb-3" />
+                ) : null}
                 <p className="text-slate-400 mb-6">
                   {callPhase === 'active'
                     ? 'Voice call in progress — speak through your device. No phone numbers are shared.'
