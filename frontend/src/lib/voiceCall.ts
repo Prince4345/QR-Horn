@@ -1,10 +1,9 @@
 import { io, type Socket } from 'socket.io-client';
-import { getSocketBase } from './apiBase';
+import { getSocketBase, getApiBase } from './apiBase';
 
-const ICE_SERVERS: RTCIceServer[] = [
+const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
   {
     urls: [
       'turn:openrelay.metered.ca:80',
@@ -15,6 +14,25 @@ const ICE_SERVERS: RTCIceServer[] = [
     credential: 'openrelayproject',
   },
 ];
+
+let cachedIceServers: RTCIceServer[] | null = null;
+
+/** Load ICE servers from the backend (env-configurable TURN); cache for the session. */
+async function loadIceServers(): Promise<RTCIceServer[]> {
+  if (cachedIceServers) return cachedIceServers;
+  try {
+    const res = await fetch(`${getApiBase()}/api/auth/config`);
+    const cfg = await res.json();
+    if (Array.isArray(cfg.iceServers) && cfg.iceServers.length > 0) {
+      cachedIceServers = cfg.iceServers as RTCIceServer[];
+      return cachedIceServers;
+    }
+  } catch {
+    // fall through to defaults
+  }
+  cachedIceServers = DEFAULT_ICE_SERVERS;
+  return cachedIceServers;
+}
 
 export type CallPhase = 'idle' | 'ringing' | 'connecting' | 'active' | 'ended' | 'declined' | 'failed';
 
@@ -81,6 +99,23 @@ function joinRoom(socket: Socket, roomId: string): Promise<JoinAck> {
       resolve(res ?? { ok: false, reason: 'not_found' });
     });
   });
+}
+
+/** Turn a getUserMedia error into a clear, accurate message. */
+function micError(err: unknown): Error {
+  const name = err instanceof DOMException ? err.name : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return new Error('Microphone blocked. Tap the lock icon in your browser address bar and allow Microphone, then try again.');
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return new Error('No microphone found on this device.');
+    case 'NotReadableError':
+      return new Error('Your microphone is in use by another app. Close it and try again.');
+    default:
+      return new Error('Could not start the microphone. Make sure no other app is using it and try again.');
+  }
 }
 
 function joinErrorMessage(ack: JoinAck): string {
@@ -188,10 +223,10 @@ export class VoiceCallSession {
     this.cleanup();
   };
 
-  private constructor(socket: Socket, roomId: string) {
+  private constructor(socket: Socket, roomId: string, iceServers: RTCIceServer[]) {
     this.socket = socket;
     this.roomId = roomId;
-    this.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    this.pc = new RTCPeerConnection({ iceServers });
     this.setupPeer();
     this.bindSocket();
   }
@@ -209,16 +244,13 @@ export class VoiceCallSession {
       });
     }
 
-    const session = new VoiceCallSession(socket, roomId);
+    const iceServers = await loadIceServers();
+    const session = new VoiceCallSession(socket, roomId, iceServers);
     try {
       await session.initLocalAudio();
     } catch (err) {
       session.cleanup();
-      const msg = err instanceof Error ? err.message : '';
-      if (/Permission|NotAllowed|denied/i.test(msg)) {
-        throw new Error('Microphone permission is required for voice calls');
-      }
-      throw new Error('Could not access microphone');
+      throw micError(err);
     }
 
     const ack = await joinRoom(socket, roomId);
@@ -280,16 +312,13 @@ export class VoiceCallSession {
       });
     }
 
-    const session = new VoiceCallSession(socket, roomId);
+    const iceServers = await loadIceServers();
+    const session = new VoiceCallSession(socket, roomId, iceServers);
     try {
       await session.initLocalAudio();
     } catch (err) {
       session.cleanup();
-      const msg = err instanceof Error ? err.message : '';
-      if (/Permission|NotAllowed|denied/i.test(msg)) {
-        throw new Error('Microphone permission is required to answer calls');
-      }
-      throw new Error('Could not access microphone');
+      throw micError(err);
     }
 
     const ack = await joinRoom(socket, roomId);

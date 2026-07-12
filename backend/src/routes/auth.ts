@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthRequest } from '../lib/auth.js';
 import { isPushConfigured } from '../lib/push.js';
 import { isSmsConfigured } from '../lib/sms.js';
-import { isVoiceConfigured } from '../lib/calls.js';
+import { isVoiceConfigured, getIceServers } from '../lib/calls.js';
 import { isGeminiConfigured } from '../lib/gemini.js';
 import { getPendingCalls } from '../lib/voiceRooms.js';
 import { supabaseAdmin } from '../lib/supabase.js';
@@ -20,6 +20,7 @@ router.get('/config', (_req, res) => {
     pushEnabled: isPushConfigured(),
     smsEnabled: isSmsConfigured(),
     voiceEnabled: isVoiceConfigured(),
+    iceServers: getIceServers(),
     geminiEnabled: isGeminiConfigured(),
     firebase: {
       apiKey: process.env.FIREBASE_API_KEY ?? null,
