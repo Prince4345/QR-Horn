@@ -1,0 +1,17 @@
+{
+  "name": "QRHorn",
+  "short_name": "QRHorn",
+  "description": "Anonymous vehicle contact via QR",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#050505",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

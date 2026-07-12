@@ -1,0 +1,17 @@
+# Render.com — one web service serves API + frontend (recommended)
+services:
+  - type: web
+    name: qrhorn
+    runtime: node
+    plan: free
+    buildCommand: npm run install:all && npm run build:prod
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # Set the rest in the Render dashboard (see DEPLOY.md):
+      # DATABASE_URL, DIRECT_URL, SUPABASE_*, FIREBASE_*, CORS_ORIGIN,
+      # VITE_APP_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, GEMINI_API_KEY, etc.

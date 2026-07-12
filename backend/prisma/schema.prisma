@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Owner {
+  id         String            @id @default(uuid())
+  authUserId String?           @unique
+  name       String
+  email      String            @unique
+  phone      String?
+  fcmToken   String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  vehicles   Vehicle[]
+  pushTokens OwnerPushToken[]
+}
+
+model OwnerPushToken {
+  id        String   @id @default(uuid())
+  ownerId   String
+  token     String   @unique
+  device    String   @default("web")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  owner     Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}
+
+model Vehicle {
+  id               String         @id @default(uuid())
+  ownerId          String
+  name             String
+  number           String
+  numberNormalized String         @unique @default("")
+  type             VehicleType
+  active           Boolean        @default(true)
+  theftMode        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  owner            Owner          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sticker          Sticker?
+  notifications    Notification[]
+  calls            Call[]
+  activities       Activity[]
+
+  @@index([ownerId])
+}
+
+model Sticker {
+  id              String   @id @default(uuid())
+  vehicleId       String   @unique
+  code            String   @unique
+  themeId         String   @default("default")
+  customImageData String?
+  /// JSON: imageMode, headline, tagline, socials, colors, overlay, showUrl
+  customization   String   @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  vehicleId String
+  reason    ContactReason
+  status    NotificationStatus @default(SENT)
+  createdAt DateTime         @default(now())
+  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
+model Call {
+  id        String     @id @default(uuid())
+  vehicleId String
+  status    CallStatus @default(CONNECTING)
+  createdAt DateTime   @default(now())
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  vehicleId   String
+  type        ActivityType
+  description String
+  createdAt   DateTime     @default(now())
+  vehicle     Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
+enum VehicleType {
+  car
+  bike
+}
+
+enum ContactReason {
+  move
+  lights
+  parking
+  emergency
+  other
+}
+
+enum NotificationStatus {
+  SENT
+  READ
+}
+
+enum CallStatus {
+  CONNECTING
+  CONNECTED
+  COMPLETED
+  FAILED
+}
+
+enum ActivityType {
+  notification
+  call
+}
