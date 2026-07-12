@@ -42,15 +42,20 @@ function attachOwnerReconnect(socket: Socket) {
   });
 }
 
+// Polling first, then upgrade to websocket — most reliable behind Render's proxy.
+const SOCKET_OPTS = {
+  transports: ['polling', 'websocket'] as string[],
+  upgrade: true,
+  reconnection: true,
+  reconnectionAttempts: 20,
+  reconnectionDelay: 800,
+  timeout: 20000,
+};
+
 function getSocket(): Socket {
   const url = getSocketBase();
   if (!sharedSocket) {
-    sharedSocket = io(url, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 20,
-      reconnectionDelay: 800,
-    });
+    sharedSocket = io(url, SOCKET_OPTS);
     attachOwnerReconnect(sharedSocket);
   } else {
     try {
@@ -58,12 +63,7 @@ function getSocket(): Socket {
       const targetHost = new URL(url).hostname;
       if (currentHost !== targetHost) {
         sharedSocket.disconnect();
-        sharedSocket = io(url, {
-          transports: ['websocket', 'polling'],
-          reconnection: true,
-          reconnectionAttempts: 20,
-          reconnectionDelay: 800,
-        });
+        sharedSocket = io(url, SOCKET_OPTS);
         attachOwnerReconnect(sharedSocket);
       }
     } catch {
@@ -107,6 +107,28 @@ export class VoiceCallSession {
   private iceQueue: RTCIceCandidateInit[] = [];
   private remoteSet = false;
   private cleaned = false;
+  private connectWatchdog: ReturnType<typeof setTimeout> | null = null;
+
+  private startConnectWatchdog() {
+    if (this.connectWatchdog) return;
+    // If media doesn't connect within 25s of negotiation, surface a clear failure
+    this.connectWatchdog = setTimeout(() => {
+      if (this.cleaned) return;
+      if (this.pc.connectionState !== 'connected') {
+        console.warn('WebRTC did not connect in time; state:', this.pc.connectionState);
+        this.setPhase('failed');
+        this.socket.emit('call:end', { roomId: this.roomId });
+        this.cleanup();
+      }
+    }, 25000);
+  }
+
+  private clearConnectWatchdog() {
+    if (this.connectWatchdog) {
+      clearTimeout(this.connectWatchdog);
+      this.connectWatchdog = null;
+    }
+  }
 
   private onOffer = async ({ roomId: rid, offer }: { roomId: string; offer: RTCSessionDescriptionInit }) => {
     if (rid !== this.roomId || !offer || this.cleaned) return;
@@ -118,6 +140,7 @@ export class VoiceCallSession {
       await this.pc.setLocalDescription(answer);
       this.socket.emit('webrtc:answer', { roomId: this.roomId, answer });
       this.setPhase('connecting');
+      this.startConnectWatchdog();
     } catch (err) {
       console.error('handle offer failed:', err);
       this.setPhase('failed');
@@ -132,6 +155,7 @@ export class VoiceCallSession {
       this.remoteSet = true;
       await this.flushIceQueue();
       this.setPhase('connecting');
+      this.startConnectWatchdog();
     } catch (err) {
       console.error('handle answer failed:', err);
       this.setPhase('failed');
@@ -228,6 +252,7 @@ export class VoiceCallSession {
           await this.pc.setLocalDescription(offer);
           this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
           this.setPhase('connecting');
+          this.startConnectWatchdog();
           resolve();
         } catch (err) {
           this.cleanup();
@@ -328,13 +353,24 @@ export class VoiceCallSession {
       if (this.cleaned) return;
       const state = this.pc.connectionState;
       if (state === 'connected') {
+        this.clearConnectWatchdog();
         this.setPhase('active');
       } else if (state === 'failed') {
+        this.clearConnectWatchdog();
         this.setPhase('failed');
         this.cleanup();
       } else if (state === 'closed') {
+        this.clearConnectWatchdog();
         this.setPhase('ended');
         this.cleanup();
+      }
+    };
+
+    this.pc.oniceconnectionstatechange = () => {
+      if (this.cleaned) return;
+      if (this.pc.iceConnectionState === 'connected' || this.pc.iceConnectionState === 'completed') {
+        this.clearConnectWatchdog();
+        this.setPhase('active');
       }
     };
   }
@@ -358,6 +394,7 @@ export class VoiceCallSession {
   private cleanup() {
     if (this.cleaned) return;
     this.cleaned = true;
+    this.clearConnectWatchdog();
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
     try {
