@@ -133,6 +133,7 @@ Open `http://localhost:3001` — API and UI on one port.
 
 | Issue | Fix |
 |-------|-----|
+| Build fails on `@types/express` or `ContactReason` | Dev deps skipped — repo uses `.npmrc` + `install:all --include=dev`; redeploy after pulling latest |
 | Blank page after deploy | Check build logs; ensure `frontend/dist` exists |
 | Auth redirect loop | Supabase Site URL + redirect URLs must match live domain |
 | QR opens wrong host | Rebuild with correct `VITE_APP_URL` and re-download stickers |
