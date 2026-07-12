@@ -153,7 +153,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       session.onPhase((phase) => {
         setCallPhase(phase);
         if (phase === 'failed') {
-          setError('Voice connection failed. Allow microphone access and try again.');
+          setError('Could not connect the call. This usually means the network needs a TURN relay — try again, or use the same Wi‑Fi to test.');
           callSessionRef.current = null;
           setStatus('idle');
           setCallPhase('idle');

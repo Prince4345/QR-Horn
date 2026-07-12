@@ -378,9 +378,14 @@ export class VoiceCallSession {
       }
     };
 
+    this.pc.onicegatheringstatechange = () => {
+      console.log('[call] ICE gathering:', this.pc.iceGatheringState);
+    };
+
     this.pc.onconnectionstatechange = () => {
       if (this.cleaned) return;
       const state = this.pc.connectionState;
+      console.log('[call] connectionState:', state);
       if (state === 'connected') {
         this.clearConnectWatchdog();
         this.setPhase('active');
@@ -397,12 +402,29 @@ export class VoiceCallSession {
 
     this.pc.oniceconnectionstatechange = () => {
       if (this.cleaned) return;
-      if (this.pc.iceConnectionState === 'connected' || this.pc.iceConnectionState === 'completed') {
+      const state = this.pc.iceConnectionState;
+      console.log('[call] iceConnectionState:', state);
+      if (state === 'connected' || state === 'completed') {
         this.clearConnectWatchdog();
         this.setPhase('active');
+      } else if (state === 'failed') {
+        // Try an ICE restart once before giving up
+        try {
+          this.pc.restartIce?.();
+        } catch {
+          // ignore
+        }
       }
     };
   }
+
+  private onReconnect = () => {
+    // Render's polling transport can drop and reconnect mid-call.
+    // Rejoin the voice room so signaling keeps flowing.
+    if (this.cleaned) return;
+    console.log('[call] socket reconnected — rejoining room', this.roomId);
+    this.socket.emit('call:join', { roomId: this.roomId }, () => {});
+  };
 
   private bindSocket() {
     this.socket.on('webrtc:offer', this.onOffer);
@@ -410,6 +432,7 @@ export class VoiceCallSession {
     this.socket.on('webrtc:ice', this.onIce);
     this.socket.on('call:declined', this.onDeclined);
     this.socket.on('call:ended', this.onEnded);
+    this.socket.io.on('reconnect', this.onReconnect);
   }
 
   end() {
@@ -438,6 +461,7 @@ export class VoiceCallSession {
     this.socket.off('webrtc:ice', this.onIce);
     this.socket.off('call:declined', this.onDeclined);
     this.socket.off('call:ended', this.onEnded);
+    this.socket.io.off('reconnect', this.onReconnect);
   }
 }
 
