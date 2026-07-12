@@ -474,9 +474,11 @@ function DashboardContent({ isActive = true }: DashboardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-6"
+      className={`w-full grid grid-cols-1 md:grid-cols-12 gap-6 transition-[max-width] ${
+        showSticker ? 'max-w-6xl' : 'max-w-4xl'
+      }`}
     >
-      <div className="md:col-span-5 flex flex-col gap-6">
+      <div className={`md:col-span-5 flex-col gap-6 ${showSticker ? 'hidden' : 'flex'}`}>
         <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[40px] p-8 flex-1 flex flex-col">
           <div className="flex justify-between items-start mb-8">
             <div>
@@ -536,7 +538,9 @@ function DashboardContent({ isActive = true }: DashboardProps) {
         </div>
       </div>
 
-      <div className="md:col-span-7 bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[40px] p-8 min-h-[500px]">
+      <div className={`bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[40px] p-6 sm:p-8 min-h-[500px] ${
+        showSticker ? 'md:col-span-12' : 'md:col-span-7'
+      }`}>
         <AnimatePresence mode="wait">
           {!showSticker ? (
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
