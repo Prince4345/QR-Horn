@@ -268,6 +268,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  // Self-heal push registration: FCM tokens rotate, and older app versions
+  // stored only one device's token. If this device already granted
+  // notification permission, silently re-fetch + re-save its token on every
+  // app load so it never silently drops off the push list.
+  const autoRegisteredRef = useRef(false);
+  useEffect(() => {
+    if (!setupComplete || !owner || autoRegisteredRef.current) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    autoRegisteredRef.current = true;
+    (async () => {
+      try {
+        const config = await ensureFirebaseConfig();
+        const token = await requestFcmToken(config);
+        const device =
+          /iPhone|iPad|iPod/i.test(navigator.userAgent)
+            ? 'ios-web'
+            : /Android/i.test(navigator.userAgent)
+              ? 'android-web'
+              : 'desktop-web';
+        await api.saveFcmToken(token, device);
+        setPushEnabled(true);
+        console.log('[push] device token re-registered');
+      } catch (err) {
+        console.warn('[push] auto re-register failed:', err);
+      }
+    })();
+  }, [setupComplete, owner, ensureFirebaseConfig]);
+
   return (
     <AuthContext.Provider
       value={{

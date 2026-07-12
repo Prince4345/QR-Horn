@@ -599,6 +599,12 @@ export function subscribeIncomingCalls(cb: (call: IncomingCall) => void) {
 
 export function declineIncomingCall(roomId: string) {
   getSocket().emit('call:decline', { roomId });
+  // HTTP fallback: on mobile the socket is often dead/reconnecting right when
+  // the user taps Decline (background throttling), and a buffered emit may
+  // arrive after the ring already timed out. The HTTP call always lands now.
+  fetch(`${getApiBase()}/api/calls/${encodeURIComponent(roomId)}/decline`, {
+    method: 'POST',
+  }).catch(() => {});
 }
 
 export type CallLifecycleEvent = { roomId: string; type: 'accepted' | 'declined' | 'ended' };
