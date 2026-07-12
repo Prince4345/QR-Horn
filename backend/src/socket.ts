@@ -14,6 +14,7 @@ import {
   bufferIce,
   clearSignals,
   replaySignalsToSocket,
+  type SignalRole,
 } from './lib/callSignaling.js';
 
 let io: Server | null = null;
@@ -49,8 +50,9 @@ export function initSocketServer(httpServer: HttpServer) {
       socket.join(`owner:${ownerId}`);
     });
 
-    socket.on('call:join', (payload: { roomId?: string }, ack?: (r: JoinAck) => void) => {
+    socket.on('call:join', (payload: { roomId?: string; role?: string }, ack?: (r: JoinAck) => void) => {
       const roomId = payload?.roomId;
+      const role: SignalRole = payload?.role === 'owner' ? 'owner' : 'caller';
       if (!roomId) {
         ack?.({ ok: false, reason: 'not_found' });
         return;
@@ -74,10 +76,10 @@ export function initSocketServer(httpServer: HttpServer) {
       }
 
       socket.join(`voice:${roomId}`);
-      replaySignalsToSocket(socket, roomId);
+      replaySignalsToSocket(socket, roomId, role);
       // If the owner already accepted before this socket joined (fast-answer
-      // race, or a reconnect), tell it right away so it can send its offer.
-      if (room.status === 'active') {
+      // race, or a reconnect), tell the caller right away so it sends its offer.
+      if (room.status === 'active' && role === 'caller') {
         socket.emit('call:accepted', { roomId });
       }
       ack?.({ ok: true, status: room.status, reason: room.status });
@@ -119,9 +121,9 @@ export function initSocketServer(httpServer: HttpServer) {
       socket.to(`voice:${roomId}`).emit('webrtc:answer', { roomId, answer });
     });
 
-    socket.on('webrtc:ice', ({ roomId, candidate }: { roomId?: string; candidate?: object }) => {
+    socket.on('webrtc:ice', ({ roomId, candidate, role }: { roomId?: string; candidate?: object; role?: string }) => {
       if (!roomId || !candidate || !getVoiceRoom(roomId)) return;
-      bufferIce(roomId, candidate);
+      bufferIce(roomId, role === 'owner' ? 'owner' : 'caller', candidate);
       socket.to(`voice:${roomId}`).emit('webrtc:ice', { roomId, candidate });
     });
   });

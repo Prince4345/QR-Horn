@@ -109,7 +109,9 @@ function ensureConnected(socket: Socket, timeoutMs = 20000): Promise<void> {
   });
 }
 
-function joinOnce(socket: Socket, roomId: string, timeoutMs: number): Promise<JoinAck> {
+type CallRole = 'caller' | 'owner';
+
+function joinOnce(socket: Socket, roomId: string, role: CallRole, timeoutMs: number): Promise<JoinAck> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timeout = setTimeout(() => {
@@ -117,7 +119,7 @@ function joinOnce(socket: Socket, roomId: string, timeoutMs: number): Promise<Jo
       settled = true;
       reject(new Error('Could not join call room'));
     }, timeoutMs);
-    socket.emit('call:join', { roomId }, (res: JoinAck) => {
+    socket.emit('call:join', { roomId, role }, (res: JoinAck) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
@@ -126,14 +128,14 @@ function joinOnce(socket: Socket, roomId: string, timeoutMs: number): Promise<Jo
   });
 }
 
-async function joinRoom(socket: Socket, roomId: string): Promise<JoinAck> {
+async function joinRoom(socket: Socket, roomId: string, role: CallRole): Promise<JoinAck> {
   await ensureConnected(socket);
   try {
-    return await joinOnce(socket, roomId, 12000);
+    return await joinOnce(socket, roomId, role, 12000);
   } catch {
     // Ack can be lost if the socket reconnected mid-flight — retry once.
     await ensureConnected(socket);
-    return joinOnce(socket, roomId, 12000);
+    return joinOnce(socket, roomId, role, 12000);
   }
 }
 
@@ -187,16 +189,35 @@ export class VoiceCallSession {
 
   private startConnectWatchdog() {
     if (this.connectWatchdog) return;
-    // If media doesn't connect within 25s of negotiation, surface a clear failure
+    // At 12s: caller retries with an ICE restart. At 30s: give up with a clear failure.
     this.connectWatchdog = setTimeout(() => {
-      if (this.cleaned) return;
-      if (this.pc.connectionState !== 'connected') {
-        console.warn('WebRTC did not connect in time; state:', this.pc.connectionState);
-        this.setPhase('failed');
-        this.socket.emit('call:end', { roomId: this.roomId });
-        this.cleanup();
+      if (this.cleaned || this.pc.connectionState === 'connected') return;
+      if (this.isCaller) {
+        console.warn('[call] not connected after 12s — attempting ICE restart');
+        this.restartConnection();
       }
-    }, 25000);
+      this.connectWatchdog = setTimeout(() => {
+        if (this.cleaned) return;
+        if (this.pc.connectionState !== 'connected') {
+          console.warn('WebRTC did not connect in time; state:', this.pc.connectionState);
+          this.setPhase('failed');
+          this.socket.emit('call:end', { roomId: this.roomId });
+          this.cleanup();
+        }
+      }, 18000);
+    }, 12000);
+  }
+
+  /** Caller-side full retry: new offer with fresh ICE credentials. */
+  private async restartConnection() {
+    if (this.cleaned || !this.isCaller) return;
+    try {
+      const offer = await this.pc.createOffer({ iceRestart: true, offerToReceiveAudio: true });
+      await this.pc.setLocalDescription(offer);
+      this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
+    } catch (err) {
+      console.warn('[call] ICE restart failed:', err);
+    }
   }
 
   private clearConnectWatchdog() {
@@ -206,10 +227,18 @@ export class VoiceCallSession {
     }
   }
 
+  private lastOfferSdp: string | null = null;
+  private lastAnswerSdp: string | null = null;
+
   private onOffer = async ({ roomId: rid, offer }: { roomId: string; offer: RTCSessionDescriptionInit }) => {
     if (rid !== this.roomId || !offer || this.cleaned) return;
+    // The caller creates offers; it must never apply one (its own, replayed).
+    if (this.isCaller) return;
+    // Ignore exact duplicates replayed by the server after a reconnect.
+    if (offer.sdp && offer.sdp === this.lastOfferSdp) return;
     try {
       await this.pc.setRemoteDescription(offer);
+      this.lastOfferSdp = offer.sdp ?? null;
       this.remoteSet = true;
       await this.flushIceQueue();
       const answer = await this.pc.createAnswer();
@@ -219,23 +248,26 @@ export class VoiceCallSession {
       this.startConnectWatchdog();
     } catch (err) {
       console.error('handle offer failed:', err);
-      this.setPhase('failed');
-      this.cleanup();
     }
   };
 
   private onAnswer = async ({ roomId: rid, answer }: { roomId: string; answer: RTCSessionDescriptionInit }) => {
     if (rid !== this.roomId || !answer || this.cleaned) return;
+    // The owner creates answers; it must never apply one (its own, replayed).
+    if (!this.isCaller) return;
+    // Only valid while we have a local offer outstanding; duplicates would
+    // throw InvalidStateError and previously tore the whole call down.
+    if (this.pc.signalingState !== 'have-local-offer') return;
+    if (answer.sdp && answer.sdp === this.lastAnswerSdp) return;
     try {
       await this.pc.setRemoteDescription(answer);
+      this.lastAnswerSdp = answer.sdp ?? null;
       this.remoteSet = true;
       await this.flushIceQueue();
       this.setPhase('connecting');
       this.startConnectWatchdog();
     } catch (err) {
       console.error('handle answer failed:', err);
-      this.setPhase('failed');
-      this.cleanup();
     }
   };
 
@@ -293,6 +325,7 @@ export class VoiceCallSession {
   private constructor(socket: Socket, roomId: string, iceServers: RTCIceServer[]) {
     this.socket = socket;
     this.roomId = roomId;
+    console.log('[call] ICE servers:', iceServers.map((s) => s.urls));
     this.pc = new RTCPeerConnection({ iceServers });
     this.setupPeer();
     this.bindSocket();
@@ -321,7 +354,7 @@ export class VoiceCallSession {
       throw micError(err);
     }
 
-    const ack = await joinRoom(socket, roomId);
+    const ack = await joinRoom(socket, roomId, 'caller');
     if (!ack.ok) {
       session.cleanup();
       throw new Error(joinErrorMessage(ack));
@@ -376,7 +409,7 @@ export class VoiceCallSession {
       throw micError(err);
     }
 
-    const ack = await joinRoom(socket, roomId);
+    const ack = await joinRoom(socket, roomId, 'owner');
     if (!ack.ok) {
       session.cleanup();
       throw new Error(joinErrorMessage(ack));
@@ -429,7 +462,11 @@ export class VoiceCallSession {
 
     this.pc.onicecandidate = (event) => {
       if (event.candidate && !this.cleaned) {
-        this.socket.emit('webrtc:ice', { roomId: this.roomId, candidate: event.candidate });
+        this.socket.emit('webrtc:ice', {
+          roomId: this.roomId,
+          candidate: event.candidate,
+          role: this.isCaller ? 'caller' : 'owner',
+        });
       }
     };
 
@@ -478,7 +515,11 @@ export class VoiceCallSession {
     // Rejoin the voice room so signaling keeps flowing.
     if (this.cleaned) return;
     console.log('[call] socket reconnected — rejoining room', this.roomId);
-    this.socket.emit('call:join', { roomId: this.roomId }, () => {});
+    this.socket.emit(
+      'call:join',
+      { roomId: this.roomId, role: this.isCaller ? 'caller' : 'owner' },
+      () => {}
+    );
   };
 
   private bindSocket() {
