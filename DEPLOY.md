@@ -63,6 +63,28 @@ Leave `VITE_API_URL` **unset** in production so the app uses the same origin as 
 | `GEMINI_API_KEY` | AI sticker backgrounds |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | SMS alerts |
 
+### Voice calls across networks (TURN)
+
+WiFi ↔ mobile-data calls need a TURN relay or they stay stuck on "Connecting…".
+STUN alone only works on the same network.
+
+**Recommended — Metered dynamic API** (server fetches the correct ICE array for your plan/region):
+
+| Variable | Purpose |
+|----------|---------|
+| `METERED_APP_NAME` | Your app name on the Metered Dashboard home (the `<appname>` in `<appname>.metered.live`) |
+| `METERED_API_KEY` | A credential's `apiKey` (Dashboard → TURN Server → your credential) |
+
+**Alternative — fixed credentials** (coturn or one Metered credential). On Metered's **free** plan only `standard.relay.metered.ca` works:
+
+| Variable | Example |
+|----------|---------|
+| `TURN_URLS` | `turn:standard.relay.metered.ca:80,turns:standard.relay.metered.ca:443?transport=tcp` |
+| `TURN_USERNAME` | from Metered |
+| `TURN_CREDENTIAL` | from Metered |
+
+If none are set, the app falls back to the free OpenRelay project (best-effort, often congested). Env changes require **Save + redeploy**.
+
 ## 3. Database schema on production
 
 After the first deploy, run migrations from your machine (uses `DIRECT_URL`):

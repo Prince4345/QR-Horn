@@ -15,12 +15,12 @@ function isProfileComplete(owner: { name: string | null; phone: string | null } 
   return !!(owner?.name?.trim() && owner?.phone?.trim());
 }
 
-router.get('/config', (_req, res) => {
+router.get('/config', async (_req, res) => {
   res.json({
     pushEnabled: isPushConfigured(),
     smsEnabled: isSmsConfigured(),
     voiceEnabled: isVoiceConfigured(),
-    iceServers: getIceServers(),
+    iceServers: await getIceServers(),
     geminiEnabled: isGeminiConfigured(),
     firebase: {
       apiKey: process.env.FIREBASE_API_KEY ?? null,
