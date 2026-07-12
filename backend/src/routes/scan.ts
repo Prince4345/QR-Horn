@@ -3,7 +3,7 @@ import { ContactReason } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { normalizePlate } from '../lib/plates.js';
 import { sendOwnerAlert } from '../lib/alerts.js';
-import { createVoiceRoom } from '../lib/voiceRooms.js';
+import { createVoiceRoom, setRoomCallId } from '../lib/voiceRooms.js';
 import { emitIncomingCall } from '../socket.js';
 import { checkScanActionLimit } from '../lib/rateLimit.js';
 import { nanoid } from 'nanoid';
@@ -64,16 +64,16 @@ async function notifyOwner(
   });
 }
 
+/**
+ * Create the Call record at initiation. The activity-feed entry (with outcome
+ * and duration) is written when the room closes — see lib/callLog.ts.
+ */
 async function recordCall(
   vehicleId: string,
   status: 'CONNECTING' | 'COMPLETED' | 'FAILED'
-) {
-  await prisma.$transaction([
-    prisma.call.create({ data: { vehicleId, status } }),
-    prisma.activity.create({
-      data: { vehicleId, type: 'call', description: 'Incoming secure call' },
-    }),
-  ]);
+): Promise<string> {
+  const call = await prisma.call.create({ data: { vehicleId, status } });
+  return call.id;
 }
 
 function formatVehicleResponse(vehicle: {
@@ -211,7 +211,8 @@ router.post('/by-number/:number/call', async (req, res) => {
       kind: 'call',
     });
 
-    await recordCall(vehicle.id, 'CONNECTING');
+    const callId = await recordCall(vehicle.id, 'CONNECTING');
+    setRoomCallId(roomId, callId);
     emitIncomingCall(vehicle.ownerId, {
       roomId,
       vehicleName: vehicle.name,
@@ -318,7 +319,8 @@ router.post('/:code/call', async (req, res) => {
       kind: 'call',
     });
 
-    await recordCall(vehicle.id, 'CONNECTING');
+    const callId = await recordCall(vehicle.id, 'CONNECTING');
+    setRoomCallId(roomId, callId);
     emitIncomingCall(vehicle.ownerId, {
       roomId,
       vehicleName: vehicle.name,

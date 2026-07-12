@@ -9,10 +9,13 @@ import {
 } from '../lib/voiceCall';
 import { useAuth } from './AuthContext';
 import { api, waitForApiReady } from '../lib/api';
+import { startRingtone, stopRingtone } from '../lib/ringtone';
 
 interface CallContextValue {
   incomingCall: IncomingCall | null;
   callPhase: CallPhase;
+  muted: boolean;
+  toggleMute: () => void;
   acceptIncomingCall: () => Promise<void>;
   declineCall: () => void;
   endActiveCall: () => void;
@@ -25,9 +28,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const { owner } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [callPhase, setCallPhase] = useState<CallPhase>('idle');
+  const [muted, setMuted] = useState(false);
   const sessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const busyRef = useRef(false);
+
+  // Ring + vibrate while an incoming call is waiting
+  useEffect(() => {
+    if (incomingCall) {
+      startRingtone();
+      return stopRingtone;
+    }
+    stopRingtone();
+  }, [incomingCall]);
 
   useEffect(() => {
     busyRef.current =
@@ -93,9 +106,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const toggleMute = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    const next = !session.isMuted();
+    session.setMuted(next);
+    setMuted(next);
+  }, []);
+
   const acceptIncomingCall = useCallback(async () => {
     if (!incomingCall) return;
     const roomId = incomingCall.roomId;
+    setMuted(false);
     setCallPhase('connecting');
     try {
       const session = await VoiceCallSession.startIncoming(roomId);
@@ -141,6 +163,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       value={{
         incomingCall,
         callPhase,
+        muted,
+        toggleMute,
         acceptIncomingCall,
         declineCall,
         endActiveCall,

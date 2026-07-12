@@ -8,7 +8,13 @@ export interface VoiceRoom {
   vehicleNumber: string;
   status: 'ringing' | 'active' | 'ended' | 'declined' | 'expired';
   createdAt: number;
+  /** Set when the owner accepts — used to compute call duration. */
+  acceptedAt?: number;
+  /** DB Call record id, for logging the outcome when the room closes. */
+  callId?: string;
 }
+
+export type CallOutcome = 'completed' | 'missed' | 'declined';
 
 export interface PendingIncomingCall {
   roomId: string;
@@ -25,10 +31,34 @@ const pendingByOwner = new Map<string, PendingIncomingCall[]>();
 const expireTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 let onRoomExpired: ((roomId: string, reason: RoomExpireReason) => void) | null = null;
+let onRoomClosed:
+  | ((room: VoiceRoom, outcome: CallOutcome, durationSec: number) => void)
+  | null = null;
+const closedRooms = new Set<string>();
 
 /** Socket layer registers this so ringing timeouts notify both peers. */
 export function setRoomExpireHandler(handler: (roomId: string, reason: RoomExpireReason) => void) {
   onRoomExpired = handler;
+}
+
+/** Fired exactly once per room when it reaches a terminal state (for call history). */
+export function setRoomClosedHandler(
+  handler: (room: VoiceRoom, outcome: CallOutcome, durationSec: number) => void
+) {
+  onRoomClosed = handler;
+}
+
+export function setRoomCallId(roomId: string, callId: string) {
+  const room = rooms.get(roomId);
+  if (room) room.callId = callId;
+}
+
+function fireRoomClosed(room: VoiceRoom, outcome: CallOutcome) {
+  if (closedRooms.has(room.roomId)) return;
+  closedRooms.add(room.roomId);
+  setTimeout(() => closedRooms.delete(room.roomId), 60_000);
+  const durationSec = room.acceptedAt ? Math.round((Date.now() - room.acceptedAt) / 1000) : 0;
+  onRoomClosed?.(room, outcome, durationSec);
 }
 
 export function createVoiceRoom(data: Omit<VoiceRoom, 'roomId' | 'status' | 'createdAt'> & { roomId?: string }) {
@@ -70,6 +100,7 @@ export function createVoiceRoom(data: Omit<VoiceRoom, 'roomId' | 'status' | 'cre
       current.status = 'expired';
       clearPendingCall(data.ownerId, roomId);
       onRoomExpired?.(roomId, 'expired');
+      fireRoomClosed(current, 'missed');
       // Keep room briefly so late joiners get a clear status, then drop
       setTimeout(() => rooms.delete(roomId), 15_000);
     }
@@ -109,6 +140,9 @@ export function setVoiceRoomStatus(roomId: string, status: VoiceRoom['status']) 
   const room = rooms.get(roomId);
   if (!room) return;
   room.status = status;
+  if (status === 'active' && !room.acceptedAt) {
+    room.acceptedAt = Date.now();
+  }
   if (status !== 'ringing') {
     clearPendingCall(room.ownerId, roomId);
     const timer = expireTimers.get(roomId);
@@ -122,7 +156,14 @@ export function setVoiceRoomStatus(roomId: string, status: VoiceRoom['status']) 
 export function endVoiceRoom(roomId: string, status: VoiceRoom['status'] = 'ended') {
   const room = rooms.get(roomId);
   if (!room) return;
+  const wasLive = room.status === 'ringing' || room.status === 'active';
   room.status = status;
+  if (wasLive) {
+    fireRoomClosed(
+      room,
+      room.acceptedAt ? 'completed' : status === 'declined' ? 'declined' : 'missed'
+    );
+  }
   clearPendingCall(room.ownerId, roomId);
   const timer = expireTimers.get(roomId);
   if (timer) {

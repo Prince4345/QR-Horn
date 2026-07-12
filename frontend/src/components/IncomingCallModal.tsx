@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, PhoneOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
 import { useCall } from '../context/CallContext';
 import CallTimer from './CallTimer';
 
 export default function IncomingCallModal() {
-  const { incomingCall, callPhase, acceptIncomingCall, declineCall, endActiveCall } = useCall();
+  const { incomingCall, callPhase, muted, toggleMute, acceptIncomingCall, declineCall, endActiveCall } = useCall();
 
   const showIncoming = !!incomingCall;
   const showActive = callPhase === 'active' || callPhase === 'connecting';
@@ -64,12 +64,25 @@ export default function IncomingCallModal() {
                 <p className="text-white/50 text-sm mb-8">
                   {callPhase === 'active' ? 'Voice call in progress' : 'Setting up secure voice…'}
                 </p>
-                <button
-                  onClick={endActiveCall}
-                  className="w-full py-3 rounded-2xl bg-red-600 text-white font-semibold flex items-center justify-center gap-2"
-                >
-                  <PhoneOff className="w-4 h-4" /> End Call
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={toggleMute}
+                    className={`flex-1 py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors ${
+                      muted
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-white/10 text-white hover:bg-white/15'
+                    }`}
+                  >
+                    {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    {muted ? 'Unmute' : 'Mute'}
+                  </button>
+                  <button
+                    onClick={endActiveCall}
+                    className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-semibold flex items-center justify-center gap-2"
+                  >
+                    <PhoneOff className="w-4 h-4" /> End Call
+                  </button>
+                </div>
               </>
             )}
           </motion.div>

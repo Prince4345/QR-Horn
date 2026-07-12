@@ -428,6 +428,19 @@ export class VoiceCallSession {
     this.onRemoteStream = cb;
   }
 
+  /** Mute/unmute the local microphone. Returns the new muted state. */
+  setMuted(muted: boolean): boolean {
+    this.localStream?.getAudioTracks().forEach((t) => {
+      t.enabled = !muted;
+    });
+    return muted;
+  }
+
+  isMuted(): boolean {
+    const track = this.localStream?.getAudioTracks()[0];
+    return track ? !track.enabled : false;
+  }
+
   private setPhase(phase: CallPhase) {
     this.onPhaseChange?.(phase);
   }

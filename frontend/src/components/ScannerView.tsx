@@ -14,6 +14,8 @@ import {
   Search,
   XCircle,
   Camera,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { api, type ContactReason, type ContactMethod, type ScanData } from '../lib/api';
 import { VoiceCallSession, type CallPhase } from '../lib/voiceCall';
@@ -45,8 +47,17 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   const [entryTab, setEntryTab] = useState<'qr' | 'plate'>('qr');
   const [showCamera, setShowCamera] = useState(false);
   const [callPhase, setCallPhase] = useState<CallPhase>('idle');
+  const [muted, setMuted] = useState(false);
   const callSessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleMute = () => {
+    const session = callSessionRef.current;
+    if (!session) return;
+    const next = !session.isMuted();
+    session.setMuted(next);
+    setMuted(next);
+  };
 
   const resetContact = () => {
     setScanData(null);
@@ -145,6 +156,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     setStatus('calling');
     setError(null);
     setCallPhase('ringing');
+    setMuted(false);
 
     try {
       const result = await api.initiateCall(contactMethod, contactId);
@@ -190,6 +202,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     callSessionRef.current = null;
     setCallPhase('idle');
     setStatus('idle');
+    setMuted(false);
   };
 
   const handleBack = () => {
@@ -442,6 +455,19 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                       ? 'Owner accepted — connecting secure voice…'
                       : 'Anonymous in-app call. The owner gets an alert and can Accept in their dashboard.'}
                 </p>
+                {callPhase === 'active' && (
+                  <button
+                    onClick={toggleMute}
+                    className={`px-6 py-2 rounded-full font-medium text-sm mr-3 inline-flex items-center gap-2 transition-colors ${
+                      muted
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        : 'bg-white/10 text-white hover:bg-white/15'
+                    }`}
+                  >
+                    {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    {muted ? 'Unmute' : 'Mute'}
+                  </button>
+                )}
                 <button
                   onClick={handleEndCall}
                   className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium text-sm"

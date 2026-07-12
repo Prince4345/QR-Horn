@@ -7,7 +7,9 @@ import {
   setVoiceRoomStatus,
   clearPendingCall,
   setRoomExpireHandler,
+  setRoomClosedHandler,
 } from './lib/voiceRooms.js';
+import { logCallOutcome } from './lib/callLog.js';
 import {
   bufferOffer,
   bufferAnswer,
@@ -42,6 +44,11 @@ export function initSocketServer(httpServer: HttpServer) {
     clearSignals(roomId);
     const event = reason === 'expired' ? 'call:declined' : 'call:ended';
     io?.to(`voice:${roomId}`).emit(event, { roomId, reason });
+  });
+
+  // Terminal room state → write outcome + duration to call history
+  setRoomClosedHandler((room, outcome, durationSec) => {
+    void logCallOutcome(room, outcome, durationSec);
   });
 
   io.on('connection', (socket: Socket) => {
