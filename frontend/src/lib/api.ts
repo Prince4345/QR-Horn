@@ -137,6 +137,12 @@ export const api = {
       body: JSON.stringify({ fcmToken, device }),
     }),
 
+  testPush: () =>
+    request<{ sent: number; total: number; errors: string[] }>('/api/auth/push-test', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
   getVehicles: () => request<Vehicle[]>('/api/vehicles'),
 
   getVehicle: (vehicleId: string) => request<Vehicle>(`/api/vehicles/${vehicleId}`),

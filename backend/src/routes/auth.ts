@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, type AuthRequest } from '../lib/auth.js';
-import { isPushConfigured } from '../lib/push.js';
+import { isPushConfigured, sendTestPushToOwner } from '../lib/push.js';
 import { isSmsConfigured } from '../lib/sms.js';
 import { isVoiceConfigured, getIceServers } from '../lib/calls.js';
 import { isGeminiConfigured } from '../lib/gemini.js';
@@ -183,16 +183,39 @@ router.patch('/fcm-token', requireAuth, async (req: AuthRequest, res) => {
     }
 
     const token = fcmToken.trim();
+    const deviceName = device?.trim() || 'web';
 
-    await prisma.owner.update({
-      where: { id: req.ownerId },
-      data: { fcmToken: token },
-    });
+    // Store per-device so enabling on the PC doesn't overwrite the phone
+    await prisma.$transaction([
+      prisma.owner.update({
+        where: { id: req.ownerId },
+        data: { fcmToken: token },
+      }),
+      prisma.ownerPushToken.upsert({
+        where: { token },
+        create: { ownerId: req.ownerId, token, device: deviceName },
+        update: { ownerId: req.ownerId, device: deviceName },
+      }),
+    ]);
 
     res.json({ success: true });
   } catch (error) {
     console.error('PATCH /api/auth/fcm-token:', error);
     res.status(500).json({ error: 'Failed to save push token' });
+  }
+});
+
+router.post('/push-test', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    if (!req.ownerId) {
+      res.status(403).json({ error: 'Complete account setup first' });
+      return;
+    }
+    const result = await sendTestPushToOwner(req.ownerId);
+    res.json(result);
+  } catch (error) {
+    console.error('POST /api/auth/push-test:', error);
+    res.status(500).json({ error: 'Failed to send test notification' });
   }
 });
 

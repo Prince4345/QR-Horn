@@ -12,6 +12,10 @@ firebase.initializeApp({
   appId: params.get('appId'),
 });
 
+// Take over from any older worker version immediately
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {

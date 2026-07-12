@@ -56,6 +56,8 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
       const existing = await navigator.serviceWorker.getRegistration('/');
       if (existing?.active?.scriptURL.includes('firebase-messaging-sw')) {
         swRegistration = existing;
+        // Pick up new worker code after deploys (stale SW = missed pushes)
+        existing.update().catch(() => {});
       } else {
         swRegistration = await navigator.serviceWorker.register(buildSwUrl(config), { scope: '/' });
       }

@@ -47,6 +47,8 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pushLoading, setPushLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   if (!owner) return null;
 
@@ -93,6 +95,23 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       setError(err instanceof Error ? err.message : 'Failed to enable notifications');
     } finally {
       setPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const result = await api.testPush();
+      if (result.sent > 0) {
+        setTestResult(`Sent to ${result.sent} of ${result.total} device(s) — check your notifications.`);
+      } else {
+        setTestResult(result.errors[0] ?? 'No devices received the test. Enable notifications on this device first.');
+      }
+    } catch (err) {
+      setTestResult(err instanceof Error ? err.message : 'Test failed');
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -254,6 +273,19 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
                   Enable
                 </button>
+              )}
+            </div>
+            <div className="mt-3">
+              <button
+                onClick={handleTestPush}
+                disabled={testLoading}
+                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+              >
+                {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+                Send test notification
+              </button>
+              {testResult && (
+                <p className="text-xs text-white/50 mt-2 text-center leading-relaxed">{testResult}</p>
               )}
             </div>
             <div className="mt-4 flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">

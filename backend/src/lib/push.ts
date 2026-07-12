@@ -35,28 +35,80 @@ function isInvalidFcmToken(err: unknown): boolean {
   return code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
 }
 
+/** All registered device tokens for an owner (multi-device table + legacy field). */
+async function collectTokens(ownerId: string): Promise<Set<string>> {
+  const [owner, rows] = await Promise.all([
+    prisma.owner.findUnique({ where: { id: ownerId }, select: { fcmToken: true } }),
+    prisma.ownerPushToken.findMany({ where: { ownerId }, select: { token: true } }),
+  ]);
+
+  const tokenSet = new Set<string>();
+  if (owner?.fcmToken) tokenSet.add(owner.fcmToken);
+  for (const row of rows) tokenSet.add(row.token);
+  return tokenSet;
+}
+
+async function removeToken(ownerId: string, token: string) {
+  await prisma.ownerPushToken.deleteMany({ where: { token } }).catch(() => {});
+  await prisma.owner
+    .updateMany({ where: { id: ownerId, fcmToken: token }, data: { fcmToken: null } })
+    .catch(() => {});
+}
+
+interface PushSendResult {
+  sent: number;
+  total: number;
+  errors: string[];
+}
+
+async function sendDataToOwnerDevices(
+  ownerId: string,
+  data: Record<string, string>,
+  ttlSeconds: number
+): Promise<PushSendResult> {
+  if (!initFirebase()) {
+    return { sent: 0, total: 0, errors: ['Push is not configured on the server'] };
+  }
+
+  const tokens = await collectTokens(ownerId);
+  if (tokens.size === 0) {
+    return { sent: 0, total: 0, errors: ['No devices have notifications enabled'] };
+  }
+
+  let sent = 0;
+  const errors: string[] = [];
+
+  for (const token of tokens) {
+    try {
+      // Data-only message: the service worker displays it (avoids duplicate
+      // notifications) and handles clicks to open the dashboard.
+      await admin.messaging().send({
+        token,
+        data,
+        webpush: {
+          headers: {
+            Urgency: 'high',
+            TTL: String(ttlSeconds),
+          },
+        },
+      });
+      sent += 1;
+    } catch (err) {
+      console.error('FCM send failed:', err);
+      errors.push((err as Error).message ?? 'Unknown FCM error');
+      if (isInvalidFcmToken(err)) {
+        await removeToken(ownerId, token);
+      }
+    }
+  }
+
+  return { sent, total: tokens.size, errors };
+}
+
 export async function sendPushToOwner(
   ownerId: string,
   payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean; kind?: 'notify' | 'call' }
 ): Promise<boolean> {
-  if (!initFirebase()) {
-    console.warn('Firebase not configured — push notification skipped');
-    return false;
-  }
-
-  const owner = await prisma.owner.findUnique({
-    where: { id: ownerId },
-    select: { fcmToken: true },
-  });
-
-  const tokenSet = new Set<string>();
-  if (owner?.fcmToken) tokenSet.add(owner.fcmToken);
-
-  if (tokenSet.size === 0) {
-    console.warn(`No FCM tokens for owner ${ownerId}`);
-    return false;
-  }
-
   const isCall = payload.kind === 'call';
   const title = isCall
     ? `📞 Incoming call — ${payload.vehicleName}`
@@ -67,38 +119,33 @@ export async function sendPushToOwner(
     ? `Someone at ${payload.vehicleNumber} wants to talk. Tap to answer.`
     : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
-  let anySent = false;
+  const result = await sendDataToOwnerDevices(
+    ownerId,
+    {
+      title,
+      body,
+      kind: payload.kind ?? 'notify',
+      url: '/?view=dashboard',
+    },
+    // A ring is pointless after the 60s timeout; alerts can wait longer
+    isCall ? 60 : 3600
+  );
 
-  for (const token of tokenSet) {
-    try {
-      // Data-only message: the service worker displays it (avoids duplicate
-      // notifications) and handles clicks to open the dashboard.
-      await admin.messaging().send({
-        token,
-        data: {
-          title,
-          body,
-          kind: payload.kind ?? 'notify',
-          url: '/?view=dashboard',
-        },
-        webpush: {
-          headers: {
-            Urgency: 'high',
-            // A ring is pointless after the 60s timeout; alerts can wait longer
-            TTL: isCall ? '60' : '3600',
-          },
-        },
-      });
-      anySent = true;
-    } catch (err) {
-      console.error('FCM send failed:', err);
-      if (isInvalidFcmToken(err) && owner?.fcmToken === token) {
-        await prisma.owner.update({ where: { id: ownerId }, data: { fcmToken: null } }).catch(() => {});
-      }
-    }
-  }
+  return result.sent > 0;
+}
 
-  return anySent;
+/** Owner-triggered test push, with diagnostics they can act on. */
+export async function sendTestPushToOwner(ownerId: string): Promise<PushSendResult> {
+  return sendDataToOwnerDevices(
+    ownerId,
+    {
+      title: '🔔 QRHorn test',
+      body: 'Push notifications are working on this device.',
+      kind: 'notify',
+      url: '/?view=dashboard',
+    },
+    300
+  );
 }
 
 export function isPushConfigured(): boolean {
