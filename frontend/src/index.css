@@ -8,6 +8,56 @@
 
 body {
   @apply bg-black text-white antialiased selection:bg-white/30 selection:text-white;
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+/* Prevent iOS from zooming inputs on focus */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* html5-qrcode injects its own DOM — tame it for mobile */
+#qrhorn-qr-reader,
+#sticker-studio-qr-reader {
+  width: 100% !important;
+  min-height: 240px;
+}
+
+#qrhorn-qr-reader video,
+#sticker-studio-qr-reader video {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 55dvh;
+  object-fit: cover;
+  border-radius: 1rem;
+}
+
+#qrhorn-qr-reader__dashboard,
+#sticker-studio-qr-reader__dashboard {
+  width: 100% !important;
+}
+
+#qrhorn-qr-reader__dashboard_section_csr,
+#sticker-studio-qr-reader__dashboard_section_csr {
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+#qrhorn-qr-reader__scan_region,
+#sticker-studio-qr-reader__scan_region {
+  width: 100% !important;
+  min-height: 240px;
+}
+
+#qrhorn-qr-reader__scan_region video,
+#sticker-studio-qr-reader__scan_region video {
+  width: 100% !important;
+  object-fit: cover;
 }
 
 .custom-scroll {

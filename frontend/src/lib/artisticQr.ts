@@ -23,7 +23,7 @@ function isFinderZone(row: number, col: number, size: number): boolean {
 /** Modules covered by the center logo badge (safe with H error correction). */
 function isLogoZone(row: number, col: number, count: number): boolean {
   const c = count / 2;
-  const radius = count * 0.11;
+  const radius = count * 0.12;
   return Math.abs(row + 0.5 - c) <= radius && Math.abs(col + 0.5 - c) <= radius;
 }
 
@@ -113,26 +113,29 @@ async function drawCenterLogo(
   logoImageDataUrl?: string | null
 ) {
   const cx = size / 2;
-  const badge = size * 0.15;
+  const badge = size * 0.17;
 
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.25)';
   ctx.shadowBlur = size * 0.02;
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(cx - badge, cx - badge, badge * 2, badge * 2, badge * 0.5);
+  ctx.roundRect(cx - badge, cx - badge, badge * 2, badge * 2, badge * 0.45);
   ctx.fill();
   ctx.restore();
 
   if (logoImageDataUrl) {
     try {
       const img = await loadImage(logoImageDataUrl);
-      const inner = badge * 1.5;
+      const inner = badge * 1.72;
+      const scale = Math.min(inner / img.width, inner / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(cx - inner / 2, cx - inner / 2, inner, inner, inner * 0.35);
       ctx.clip();
-      ctx.drawImage(img, cx - inner / 2, cx - inner / 2, inner, inner);
+      ctx.drawImage(img, cx - w / 2, cx - h / 2, w, h);
       ctx.restore();
       return;
     } catch {
@@ -208,6 +211,7 @@ async function renderPhotoQr(
     for (let col = 0; col < moduleCount; col++) {
       if (!qr.modules.get(row, col)) continue;
       if (isFinderZone(row, col, moduleCount)) continue;
+      if (isLogoZone(row, col, moduleCount)) continue;
       const [r, g, b] = sampleAt(col, row);
       const lum = luminance(r, g, b);
       const darken = lum > 110 ? 0.55 : 0.15;

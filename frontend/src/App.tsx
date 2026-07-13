@@ -69,35 +69,37 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
+    <div className="min-h-dvh bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
 
       {/* App navigation — switch between public scanner and owner dashboard */}
-      <div className="fixed top-4 left-0 right-0 z-50 flex justify-center pointer-events-none">
-        <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-1 pointer-events-auto">
+      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-[max(1rem,env(safe-area-inset-top))] px-3">
+        <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-0.5 sm:gap-1 pointer-events-auto max-w-full">
           <button
             onClick={openScanner}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 transition-colors ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
               view === 'scanner' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <QrCode className="w-4 h-4" />
-            Scanner
+            <QrCode className="w-4 h-4 shrink-0" />
+            <span className="sm:hidden">Scan</span>
+            <span className="hidden sm:inline">Scanner</span>
           </button>
           <button
             onClick={openDashboard}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 transition-colors ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
               view === 'dashboard' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <LayoutDashboard className="w-4 h-4" />
-            Owner dashboard
+            <LayoutDashboard className="w-4 h-4 shrink-0" />
+            <span className="sm:hidden">Owner</span>
+            <span className="hidden sm:inline">Owner dashboard</span>
           </button>
         </div>
       </div>
 
-      <main className="pt-20 pb-12 px-4 min-h-screen flex flex-col items-center">
+      <main className="pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))] px-3 sm:px-4 min-h-dvh flex flex-col items-center w-full">
         <div className={view === 'scanner' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'scanner'}>
           <ScannerView scanCode={scanCode} />
         </div>

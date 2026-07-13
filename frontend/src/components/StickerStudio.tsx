@@ -18,6 +18,7 @@ import QrCameraScanner from './QrCameraScanner';
 import { getScanUrl } from '../lib/scanUrl';
 import { QR_ART_PRESETS, getArtPreset } from '../lib/qrArtStyles';
 import { api } from '../lib/api';
+import { resizeImageDataUrl } from '../lib/imageResize';
 import {
   DEFAULT_STICKER_CUSTOMIZATION,
   socialLabel,
@@ -68,6 +69,17 @@ export default function StickerStudio({
   const [stylizeError, setStylizeError] = useState<string | null>(null);
   const [showScanTest, setShowScanTest] = useState(false);
   const [scanTestResult, setScanTestResult] = useState<'success' | 'fail' | null>(null);
+  const [qrSize, setQrSize] = useState(140);
+
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      setQrSize(w < 360 ? 96 : w < 420 ? 112 : w < 640 ? 128 : 140);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   useEffect(() => {
     setDraft(customization);
@@ -129,7 +141,10 @@ export default function StickerStudio({
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      patch({ centerLogoImage: event.target?.result as string });
+      const dataUrl = event.target?.result as string;
+      resizeImageDataUrl(dataUrl, 160, 160, 'image/png')
+        .then((resized) => patch({ centerLogoImage: resized }))
+        .catch(() => patch({ centerLogoImage: dataUrl }));
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -181,19 +196,19 @@ export default function StickerStudio({
 
   return (
     <div className="h-full flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
         <button
           onClick={onBack}
-          className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"
+          className="text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 shrink-0"
         >
-          &larr; Back to details
+          &larr; <span className="hidden sm:inline">Back to details</span><span className="sm:hidden">Back</span>
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="hidden sm:block text-xs text-white/40">Sticker studio</span>
           <button
             onClick={onSave}
             disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all active:scale-95"
+            className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-lg shadow-blue-900/30 transition-all active:scale-95 shrink-0"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Save sticker
@@ -201,19 +216,19 @@ export default function StickerStudio({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
         {/* ---------- Preview ---------- */}
-        <div className="flex flex-col items-center lg:sticky lg:top-2">
+        <div className="flex flex-col items-center lg:sticky lg:top-2 w-full">
           <div
             ref={stickerRef}
-            className="w-[300px] aspect-[3/4] rounded-[28px] shadow-2xl ring-1 ring-white/10 relative overflow-hidden"
+            className="w-full max-w-[300px] aspect-[3/4] rounded-[28px] shadow-2xl ring-1 ring-white/10 relative overflow-hidden"
             style={cardBackground}
           >
             {/* legibility scrims — keep text readable over any art */}
             <div className="absolute inset-x-0 top-0 h-2/5 bg-gradient-to-b from-black/70 via-black/25 to-transparent pointer-events-none" />
             <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/75 via-black/30 to-transparent pointer-events-none" />
 
-            <div className="relative z-10 h-full flex flex-col justify-between p-5 text-white">
+            <div className="relative z-10 h-full flex flex-col justify-between p-4 sm:p-5 text-white">
               {/* Header */}
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
@@ -231,7 +246,7 @@ export default function StickerStudio({
               <div className="flex justify-center">
                 <StickerQRCode
                   code={stickerCode}
-                  size={140}
+                  size={qrSize}
                   artStyle={draft.artStyle}
                   darkColor={draft.qrDark}
                   lightColor={draft.qrLight}
@@ -239,6 +254,7 @@ export default function StickerStudio({
                   logoText={(draft.headline || 'Q').trim().charAt(0)}
                   logoImageDataUrl={draft.centerLogoImage}
                   withFrame
+                  className="max-w-full h-auto"
                 />
               </div>
 
@@ -308,7 +324,8 @@ export default function StickerStudio({
         </div>
 
         {/* ---------- Controls ---------- */}
-        <div className="space-y-5 text-left max-h-[640px] overflow-y-auto pr-2 -mr-2 custom-scroll">
+        {/* Inner scroll only on desktop — on mobile the page itself scrolls */}
+        <div className="space-y-5 text-left lg:max-h-[640px] lg:overflow-y-auto lg:pr-2 lg:-mr-2 custom-scroll">
           {/* AI design */}
           <section className="rounded-2xl border border-violet-500/25 bg-gradient-to-br from-violet-500/[0.10] to-fuchsia-500/[0.04] p-5">
             <div className="flex items-center gap-2 mb-1">
@@ -428,7 +445,7 @@ export default function StickerStudio({
                   <img
                     src={draft.centerLogoImage}
                     alt="Center logo"
-                    className="w-10 h-10 rounded-lg object-cover border border-white/20"
+                    className="w-10 h-10 rounded-lg object-contain bg-white/10 border border-white/20 p-0.5"
                   />
                   <button
                     type="button"

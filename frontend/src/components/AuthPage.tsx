@@ -61,7 +61,7 @@ export default function AuthPage() {
 
   if (!isSupabaseConfigured) {
     return (
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] p-10 text-center">
+      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center">
         <h2 className="text-xl font-semibold mb-2">Auth Not Configured</h2>
         <p className="text-white/50 text-sm">
           Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to frontend/.env
@@ -154,7 +154,7 @@ export default function AuthPage() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] p-8"
+      className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-5 sm:p-8"
     >
       <div className="text-center mb-8">
         <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">

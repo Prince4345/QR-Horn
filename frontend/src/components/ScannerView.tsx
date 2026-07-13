@@ -216,7 +216,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] overflow-hidden"
+        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] overflow-hidden"
       >
         <div className="flex border-b border-white/10">
           <button
@@ -239,7 +239,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           </button>
         </div>
 
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           <AnimatePresence mode="wait">
             {entryTab === 'qr' ? (
               <motion.div key="qr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
@@ -306,7 +306,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] p-12 flex flex-col items-center"
+        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-8 sm:p-12 flex flex-col items-center"
       >
         <Loader2 className="w-8 h-8 animate-spin text-blue-400 mb-4" />
         <p className="text-white/60 text-sm">
@@ -321,7 +321,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-[40px] p-10 text-center"
+        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center"
       >
         <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
           <AlertTriangle className="w-8 h-8 text-red-400" />
@@ -340,9 +340,9 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-md relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden"
+      className="w-full max-w-md relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 rounded-2xl sm:rounded-[40px] shadow-2xl overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
     >
-      <div className="p-8 flex flex-col h-full relative z-10">
+      <div className="p-5 sm:p-8 flex flex-col h-full relative z-10">
         {!scanCode && (
           <button onClick={handleBack} className="text-sm text-slate-400 hover:text-white transition-colors mb-4 self-start">
             &larr; Back
@@ -373,7 +373,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-6">
                 <div className="space-y-4 mb-8">
                   <p className="text-white/60 text-sm text-center mb-6">Select a reason to contact the owner anonymously.</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     {REASONS.map((reason) => {
                       const Icon = reason.icon;
                       const isSelected = selectedReason === reason.id;

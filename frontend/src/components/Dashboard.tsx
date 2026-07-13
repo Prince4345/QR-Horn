@@ -487,15 +487,15 @@ function DashboardContent({ isActive = true }: DashboardProps) {
       }`}
     >
       <div className={`md:col-span-5 flex-col gap-6 ${showSticker ? 'hidden' : 'flex'}`}>
-        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[40px] p-8 flex-1 flex flex-col">
-          <div className="flex justify-between items-start mb-8">
+        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl sm:rounded-[40px] p-5 sm:p-8 flex-1 flex flex-col">
+          <div className="flex flex-wrap justify-between items-start gap-3 mb-6 sm:mb-8">
             <div>
-              <h2 className="text-3xl font-light mb-1">Active Vehicles</h2>
+              <h2 className="text-2xl sm:text-3xl font-light mb-1">Active Vehicles</h2>
               <p className="text-white/40 text-sm italic">{vehicles.length} Vehicles Protected</p>
             </div>
             <button
               onClick={() => setShowAddVehicle(true)}
-              className="px-6 py-3 bg-white text-black rounded-full font-semibold text-sm transition-transform active:scale-95 flex items-center gap-2"
+              className="px-5 py-2.5 sm:px-6 sm:py-3 bg-white text-black rounded-full font-semibold text-sm transition-transform active:scale-95 flex items-center gap-2"
             >
               <Plus className="w-4 h-4" /> Add Vehicle
             </button>
@@ -506,7 +506,7 @@ function DashboardContent({ isActive = true }: DashboardProps) {
               <button
                 key={vehicle.id}
                 onClick={() => { setSelectedVehicle(vehicle); setShowSticker(false); }}
-                className={`p-5 rounded-3xl border flex items-center gap-6 transition-colors cursor-pointer text-left ${
+                className={`p-4 sm:p-5 rounded-3xl border flex items-center gap-4 sm:gap-6 transition-colors cursor-pointer text-left ${
                   selectedVehicle.id === vehicle.id ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
                 }`}
               >
@@ -546,19 +546,19 @@ function DashboardContent({ isActive = true }: DashboardProps) {
         </div>
       </div>
 
-      <div className={`bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[40px] p-6 sm:p-8 min-h-[500px] ${
+      <div className={`bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] p-4 sm:p-8 min-h-0 sm:min-h-[500px] ${
         showSticker ? 'md:col-span-12' : 'md:col-span-7'
       }`}>
         <AnimatePresence mode="wait">
           {!showSticker ? (
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
-              <div className="flex items-start justify-between mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
                 <div>
-                  <h1 className="text-3xl font-display font-bold mb-2">{selectedVehicle.name}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">{selectedVehicle.name}</h1>
                   <span className="px-3 py-1 rounded-md bg-white/10 font-mono text-sm tracking-widest text-slate-300">{selectedVehicle.number}</span>
                 </div>
-                <div className="flex flex-col gap-2 items-end">
-                  <div className="flex gap-2">
+                <div className="flex flex-col gap-2 items-start sm:items-end">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setShowEditVehicle(true)}
                       className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1"
