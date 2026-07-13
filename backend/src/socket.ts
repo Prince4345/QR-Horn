@@ -145,19 +145,20 @@ export function initSocketServer(httpServer: HttpServer) {
     socket.on('webrtc:offer', ({ roomId, offer }: { roomId?: string; offer?: object }) => {
       if (!roomId || !offer || !getVoiceRoom(roomId)) return;
       bufferOffer(roomId, offer);
-      socket.to(`voice:${roomId}`).emit('webrtc:offer', { roomId, offer });
+      // Broadcast to every socket in the room (clients ignore their own role's echo).
+      io!.to(`voice:${roomId}`).emit('webrtc:offer', { roomId, offer });
     });
 
     socket.on('webrtc:answer', ({ roomId, answer }: { roomId?: string; answer?: object }) => {
       if (!roomId || !answer || !getVoiceRoom(roomId)) return;
       bufferAnswer(roomId, answer);
-      socket.to(`voice:${roomId}`).emit('webrtc:answer', { roomId, answer });
+      io!.to(`voice:${roomId}`).emit('webrtc:answer', { roomId, answer });
     });
 
     socket.on('webrtc:ice', ({ roomId, candidate, role }: { roomId?: string; candidate?: object; role?: string }) => {
       if (!roomId || !candidate || !getVoiceRoom(roomId)) return;
       bufferIce(roomId, role === 'owner' ? 'owner' : 'caller', candidate);
-      socket.to(`voice:${roomId}`).emit('webrtc:ice', { roomId, candidate });
+      io!.to(`voice:${roomId}`).emit('webrtc:ice', { roomId, candidate });
     });
   });
 

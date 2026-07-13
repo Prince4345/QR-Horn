@@ -196,9 +196,32 @@ export class VoiceCallSession {
   private remoteSet = false;
   private cleaned = false;
   private connectWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private resyncInterval: ReturnType<typeof setInterval> | null = null;
+  private audioReady = false;
+  private pendingOffer: RTCSessionDescriptionInit | null = null;
+
+  private startSignalResync() {
+    if (this.resyncInterval || this.cleaned) return;
+    void this.requestSignalReplay();
+    this.resyncInterval = setInterval(() => {
+      if (this.cleaned || this.pc.connectionState === 'connected') {
+        this.stopSignalResync();
+        return;
+      }
+      void this.requestSignalReplay();
+    }, 3000);
+  }
+
+  private stopSignalResync() {
+    if (this.resyncInterval) {
+      clearInterval(this.resyncInterval);
+      this.resyncInterval = null;
+    }
+  }
 
   private startConnectWatchdog() {
     if (this.connectWatchdog) return;
+    this.startSignalResync();
     this.connectWatchdog = setTimeout(() => {
       if (this.cleaned || this.pc.connectionState === 'connected') return;
       console.warn(
@@ -230,14 +253,25 @@ export class VoiceCallSession {
     }, 12000);
   }
 
-  /** Caller: resend the full offer (not just ICE restart) when no answer arrived. */
+  /** Caller: rebroadcast the current offer or create one if missing. */
   private async resendOffer() {
     if (this.cleaned || !this.isCaller) return;
     try {
+      if (this.pc.signalingState === 'have-local-offer' && this.pc.localDescription) {
+        const offer = {
+          type: this.pc.localDescription.type,
+          sdp: this.pc.localDescription.sdp,
+        } as RTCSessionDescriptionInit;
+        this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
+        console.log('[call] re-broadcast offer (no answer yet)');
+        void this.requestSignalReplay();
+        return;
+      }
       const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
       await this.pc.setLocalDescription(offer);
       this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
       console.log('[call] re-sent offer (no answer yet)');
+      void this.requestSignalReplay();
     } catch (err) {
       console.warn('[call] resend offer failed:', err);
     }
@@ -283,22 +317,44 @@ export class VoiceCallSession {
     if (this.isCaller) return;
     // Ignore exact duplicates only after remote description is applied.
     if (offer.sdp && offer.sdp === this.lastOfferSdp && this.remoteSet) return;
+    if (!this.audioReady) {
+      this.pendingOffer = {
+        type: offer.type ?? 'offer',
+        sdp: offer.sdp,
+      };
+      console.log('[call] queued offer until mic is ready');
+      return;
+    }
+    await this.processOffer(offer);
+  };
+
+  private async processOffer(offer: RTCSessionDescriptionInit) {
+    if (this.cleaned || this.isCaller) return;
     try {
+      const desc: RTCSessionDescriptionInit = {
+        type: offer.type ?? 'offer',
+        sdp: offer.sdp,
+      };
       console.log('[call] applying remote offer, signaling:', this.pc.signalingState);
-      await this.pc.setRemoteDescription(offer);
+      await this.pc.setRemoteDescription(desc);
       this.lastOfferSdp = offer.sdp ?? null;
       this.remoteSet = true;
       await this.flushIceQueue();
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
-      this.socket.emit('webrtc:answer', { roomId: this.roomId, answer });
+      const payload = {
+        type: answer.type,
+        sdp: answer.sdp,
+      } as RTCSessionDescriptionInit;
+      this.socket.emit('webrtc:answer', { roomId: this.roomId, answer: payload });
+      console.log('[call] sent answer, signaling:', this.pc.signalingState);
       this.setPhase('connecting');
       this.startConnectWatchdog();
     } catch (err) {
       console.error('handle offer failed:', err);
       this.setPhase('failed');
     }
-  };
+  }
 
   private onAnswer = async ({ roomId: rid, answer }: { roomId: string; answer: RTCSessionDescriptionInit }) => {
     if (rid !== this.roomId || !answer || this.cleaned) return;
@@ -309,8 +365,12 @@ export class VoiceCallSession {
     if (this.pc.signalingState !== 'have-local-offer') return;
     if (answer.sdp && answer.sdp === this.lastAnswerSdp && this.remoteSet) return;
     try {
+      const desc: RTCSessionDescriptionInit = {
+        type: answer.type ?? 'answer',
+        sdp: answer.sdp,
+      };
       console.log('[call] applying remote answer, signaling:', this.pc.signalingState);
-      await this.pc.setRemoteDescription(answer);
+      await this.pc.setRemoteDescription(desc);
       this.lastAnswerSdp = answer.sdp ?? null;
       this.remoteSet = true;
       await this.flushIceQueue();
@@ -452,14 +512,8 @@ export class VoiceCallSession {
 
     const iceServers = await loadIceServers();
     const session = new VoiceCallSession(socket, roomId, iceServers);
-    try {
-      await session.initLocalAudio();
-    } catch (err) {
-      session.cleanup();
-      throw micError(err);
-    }
 
-    // Join the voice room FIRST so we're listening before the caller sends SDP.
+    // Join the voice room FIRST so we receive the caller's offer immediately.
     const ack = await joinRoom(socket, roomId, 'owner');
     if (!ack.ok) {
       session.cleanup();
@@ -467,9 +521,21 @@ export class VoiceCallSession {
     }
 
     await notifyCallAccept(socket, roomId);
-
-    // Caller may have already emitted an offer during accept — pull it from buffer.
     await session.requestSignalReplay();
+
+    try {
+      await session.initLocalAudio();
+      session.audioReady = true;
+      if (session.pendingOffer) {
+        const offer = session.pendingOffer;
+        session.pendingOffer = null;
+        await session.processOffer(offer);
+      }
+    } catch (err) {
+      session.cleanup();
+      throw micError(err);
+    }
+
     session.setPhase('connecting');
     session.startConnectWatchdog();
     return session;
@@ -548,6 +614,7 @@ export class VoiceCallSession {
       console.log('[call] connectionState:', state);
       if (state === 'connected') {
         this.clearConnectWatchdog();
+        this.stopSignalResync();
         this.setPhase('active');
       } else if (state === 'failed') {
         this.clearConnectWatchdog();
@@ -612,6 +679,7 @@ export class VoiceCallSession {
     if (this.cleaned) return;
     this.cleaned = true;
     this.clearConnectWatchdog();
+    this.stopSignalResync();
     if (this.acceptTimeout) {
       clearTimeout(this.acceptTimeout);
       this.acceptTimeout = null;
