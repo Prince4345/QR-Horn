@@ -97,19 +97,23 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!owner?.id) return;
     const unsub = subscribeCallLifecycle(({ roomId, type }) => {
-      rememberDismissed(dismissedRoomsRef.current, roomId);
       const current = incomingCallRef.current;
       const phase = callPhaseRef.current;
-      if (current?.roomId !== roomId && phase !== 'connecting' && phase !== 'active') return;
+
+      if (type === 'declined' || type === 'ended') {
+        rememberDismissed(dismissedRoomsRef.current, roomId);
+      }
 
       if (type === 'accepted') {
-        if (phase === 'ringing') {
+        // Another device picked up — stop ringing here only
+        if (phase === 'ringing' && current?.roomId === roomId) {
+          rememberDismissed(dismissedRoomsRef.current, roomId);
           clearRing('idle');
         }
         return;
       }
 
-      if (phase === 'ringing' || current?.roomId === roomId) {
+      if (phase === 'ringing' && current?.roomId === roomId) {
         sessionRef.current?.end();
         sessionRef.current = null;
         clearRing(type);
@@ -215,12 +219,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!incomingCall || acceptingRef.current) return;
     const roomId = incomingCall.roomId;
     acceptingRef.current = true;
-    rememberDismissed(dismissedRoomsRef.current, roomId);
     setMuted(false);
     setCallPhase('connecting');
     setIncomingCall(null);
     try {
       const session = await VoiceCallSession.startIncoming(roomId);
+      rememberDismissed(dismissedRoomsRef.current, roomId);
       sessionRef.current = session;
       session.onPhase((phase) => {
         setCallPhase(phase);
@@ -233,7 +237,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
       session.onRemote(attachRemote);
     } catch (err) {
       console.error('Accept call failed:', err);
-      await declineIncomingCall(roomId);
+      sessionRef.current?.end();
+      sessionRef.current = null;
       setCallPhase('failed');
       setIncomingCall(null);
       setTimeout(() => setCallPhase('idle'), 2000);

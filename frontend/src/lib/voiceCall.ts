@@ -169,22 +169,14 @@ function joinErrorMessage(ack: JoinAck): string {
   }
 }
 
-/** Tell server the owner accepted; retries once if the socket hiccups. */
-function emitCallAccept(roomId: string): Promise<void> {
-  const socket = getSocket();
-  const emitOnce = () =>
-    new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Accept timed out')), 8000);
-      socket.emit('call:accept', { roomId }, (res: { ok?: boolean } = {}) => {
-        clearTimeout(timer);
-        if (res.ok) resolve();
-        else reject(new Error('Server rejected accept'));
-      });
-    });
-
-  return ensureConnected(socket).then(() =>
-    emitOnce().catch(() => ensureConnected(socket).then(() => emitOnce()))
-  );
+/** Notify server the owner accepted. Fire-and-forget with a short retry — never
+ *  block the call on a socket ack (acks are unreliable on mobile polling). */
+async function notifyCallAccept(socket: Socket, roomId: string): Promise<void> {
+  await ensureConnected(socket);
+  socket.emit('call:accept', { roomId });
+  // One quick retry in case the first emit landed during a reconnect flap
+  await new Promise((r) => setTimeout(r, 400));
+  socket.emit('call:accept', { roomId });
 }
 
 export class VoiceCallSession {
@@ -427,13 +419,16 @@ export class VoiceCallSession {
       throw micError(err);
     }
 
+    // Tell the caller to send its WebRTC offer before we finish joining —
+    // the server buffers the offer and replays it when we join the voice room.
+    await notifyCallAccept(socket, roomId);
+
     const ack = await joinRoom(socket, roomId, 'owner');
     if (!ack.ok) {
       session.cleanup();
       throw new Error(joinErrorMessage(ack));
     }
 
-    await emitCallAccept(roomId);
     session.setPhase('connecting');
     return session;
   }
