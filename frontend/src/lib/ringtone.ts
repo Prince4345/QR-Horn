@@ -1,14 +1,39 @@
 /**
  * Looping incoming-call ringtone (Web Audio) + vibration on mobile.
- * Browsers block audio before the first user gesture; we retry each loop so
- * the ring starts as soon as the page is allowed to play sound.
+ *
+ * Both audio and vibration require a prior user gesture in modern Chrome
+ * (see https://www.chromestatus.com/feature/5644273861001216). We unlock on
+ * the first tap anywhere in the app, then ring/vibrate on incoming calls.
  */
 
 let ctx: AudioContext | null = null;
 let ringInterval: ReturnType<typeof setInterval> | null = null;
+let userGestureUnlocked = false;
+let unlockListenerAttached = false;
+
+function attachGestureUnlock() {
+  if (unlockListenerAttached || typeof window === 'undefined') return;
+  unlockListenerAttached = true;
+
+  const unlock = () => {
+    userGestureUnlocked = true;
+    if (ctx?.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+  };
+
+  window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+  window.addEventListener('keydown', unlock, { once: true });
+}
+
+/** Call once at app boot so the first dashboard tap unlocks ring + vibrate. */
+export function initRingtoneUnlock() {
+  attachGestureUnlock();
+}
 
 function playRingBurst(audio: AudioContext) {
-  // Classic two-tone ring: two short dual-frequency bursts
   const now = audio.currentTime;
   for (const offset of [0, 0.6]) {
     for (const freq of [440, 480]) {
@@ -28,14 +53,23 @@ function playRingBurst(audio: AudioContext) {
   }
 }
 
+function tryVibrate() {
+  if (!userGestureUnlocked || !navigator.vibrate) return;
+  try {
+    navigator.vibrate([400, 250, 400]);
+  } catch {
+    // Vibration not available on this device
+  }
+}
+
 export function startRingtone() {
   stopRingtone();
+  attachGestureUnlock();
 
   const tick = () => {
     try {
       if (!ctx) ctx = new AudioContext();
-      if (ctx.state === 'suspended') {
-        // Autoplay-blocked until a user gesture; keep trying each loop
+      if (ctx.state === 'suspended' && userGestureUnlocked) {
         ctx.resume().catch(() => {});
       }
       if (ctx.state === 'running') {
@@ -44,11 +78,7 @@ export function startRingtone() {
     } catch {
       // Audio not available
     }
-    try {
-      navigator.vibrate?.([400, 250, 400]);
-    } catch {
-      // Vibration not available
-    }
+    tryVibrate();
   };
 
   tick();
@@ -60,9 +90,11 @@ export function stopRingtone() {
     clearInterval(ringInterval);
     ringInterval = null;
   }
-  try {
-    navigator.vibrate?.(0);
-  } catch {
-    // ignore
+  if (userGestureUnlocked && navigator.vibrate) {
+    try {
+      navigator.vibrate(0);
+    } catch {
+      // ignore
+    }
   }
 }
