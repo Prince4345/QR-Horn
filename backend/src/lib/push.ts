@@ -64,7 +64,8 @@ interface PushSendResult {
 async function sendDataToOwnerDevices(
   ownerId: string,
   data: Record<string, string>,
-  ttlSeconds: number
+  ttlSeconds: number,
+  webNotification?: { title: string; body: string; link?: string }
 ): Promise<PushSendResult> {
   if (!initFirebase()) {
     return { sent: 0, total: 0, errors: ['Push is not configured on the server'] };
@@ -85,12 +86,30 @@ async function sendDataToOwnerDevices(
       await admin.messaging().send({
         token,
         data,
-        webpush: {
-          headers: {
-            Urgency: 'high',
-            TTL: String(ttlSeconds),
-          },
-        },
+        ...(webNotification
+          ? {
+              webpush: {
+                headers: {
+                  Urgency: 'high',
+                  TTL: String(ttlSeconds),
+                },
+                notification: {
+                  title: webNotification.title,
+                  body: webNotification.body,
+                  tag: data.kind === 'call' ? 'qrhorn-call' : 'qrhorn-alert',
+                  requireInteraction: data.kind === 'call',
+                },
+                ...(webNotification.link ? { fcmOptions: { link: webNotification.link } } : {}),
+              },
+            }
+          : {
+              webpush: {
+                headers: {
+                  Urgency: 'high',
+                  TTL: String(ttlSeconds),
+                },
+              },
+            }),
       });
       sent += 1;
     } catch (err) {
@@ -126,19 +145,25 @@ export async function sendPushToOwner(
     ? `Someone at ${payload.vehicleNumber} wants to talk. Tap to answer.`
     : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
+  const appBase = process.env.KEEP_ALIVE_URL?.trim()?.replace(/\/$/, '') ?? '';
+  const relativeUrl =
+    isCall && payload.roomId
+      ? `/?view=dashboard&call=${encodeURIComponent(payload.roomId)}`
+      : '/?view=dashboard';
+
   const data: Record<string, string> = {
     title,
     body,
     kind: payload.kind ?? 'notify',
-    url: '/?view=dashboard',
+    url: relativeUrl,
   };
   if (payload.roomId) data.roomId = payload.roomId;
 
   const result = await sendDataToOwnerDevices(
     ownerId,
     data,
-    // A ring is pointless after the 60s timeout; alerts can wait longer
-    isCall ? 60 : 3600
+    isCall ? 60 : 3600,
+    isCall ? { title, body, link: appBase ? `${appBase}${relativeUrl}` : undefined } : undefined
   );
 
   return result.sent > 0;

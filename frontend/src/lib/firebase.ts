@@ -100,6 +100,12 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
           // non-call alerts get a plain notification while foreground.
           new Notification(title, { body });
         }
+        if (isCall) {
+          if (data.url) {
+            window.history.replaceState(null, '', data.url);
+          }
+          window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
+        }
         window.dispatchEvent(new CustomEvent('qrhorn:ping'));
       });
       onMessageBound = true;

@@ -48,6 +48,11 @@ export default function App() {
       if (event.data?.type === 'qrhorn:open-dashboard') {
         setView('dashboard');
         setScanCode(undefined);
+        const url = event.data?.url as string | undefined;
+        if (url) {
+          window.history.replaceState(null, '', url.startsWith('http') ? new URL(url).pathname + new URL(url).search : url);
+        }
+        window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
       }
     };
     navigator.serviceWorker.addEventListener('message', onSwMessage);

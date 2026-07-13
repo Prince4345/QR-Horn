@@ -1,13 +1,25 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Phone, PhoneOff, Mic, MicOff } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Loader2 } from 'lucide-react';
 import { useCall } from '../context/CallContext';
 import CallTimer from './CallTimer';
+import { useState } from 'react';
 
 export default function IncomingCallModal() {
   const { incomingCall, callPhase, muted, toggleMute, acceptIncomingCall, declineCall, endActiveCall } = useCall();
+  const [accepting, setAccepting] = useState(false);
 
   const showIncoming = !!incomingCall;
   const showActive = callPhase === 'active' || callPhase === 'connecting';
+
+  const handleAccept = async () => {
+    if (accepting) return;
+    setAccepting(true);
+    try {
+      await acceptIncomingCall();
+    } finally {
+      setAccepting(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -36,15 +48,18 @@ export default function IncomingCallModal() {
                 <div className="flex gap-3">
                   <button
                     onClick={declineCall}
-                    className="flex-1 py-3 rounded-2xl bg-red-500/20 text-red-300 font-semibold flex items-center justify-center gap-2"
+                    disabled={accepting}
+                    className="flex-1 py-3 rounded-2xl bg-red-500/20 text-red-300 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <PhoneOff className="w-4 h-4" /> Decline
                   </button>
                   <button
-                    onClick={acceptIncomingCall}
-                    className="flex-1 py-3 rounded-2xl bg-green-600 text-white font-semibold flex items-center justify-center gap-2"
+                    onClick={handleAccept}
+                    disabled={accepting}
+                    className="flex-1 py-3 rounded-2xl bg-green-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    <Phone className="w-4 h-4" /> Accept
+                    {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+                    {accepting ? 'Accepting…' : 'Accept'}
                   </button>
                 </div>
               </>

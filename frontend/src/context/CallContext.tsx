@@ -25,6 +25,13 @@ interface CallContextValue {
 
 const CallContext = createContext<CallContextValue | null>(null);
 
+const DISMISS_TTL_MS = 120_000;
+
+function rememberDismissed(rooms: Set<string>, roomId: string) {
+  rooms.add(roomId);
+  setTimeout(() => rooms.delete(roomId), DISMISS_TTL_MS);
+}
+
 export function CallProvider({ children }: { children: ReactNode }) {
   const { owner } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
@@ -32,7 +39,28 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [muted, setMuted] = useState(false);
   const sessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const busyRef = useRef(false);
+  const incomingCallRef = useRef<IncomingCall | null>(null);
+  const callPhaseRef = useRef<CallPhase>('idle');
+  const dismissedRoomsRef = useRef<Set<string>>(new Set());
+  const acceptingRef = useRef(false);
+  const decliningRef = useRef(false);
+
+  incomingCallRef.current = incomingCall;
+  callPhaseRef.current = callPhase;
+
+  const clearRing = useCallback((phase: CallPhase = 'idle') => {
+    setIncomingCall(null);
+    setCallPhase(phase);
+  }, []);
+
+  const showIncoming = useCallback((call: IncomingCall) => {
+    if (dismissedRoomsRef.current.has(call.roomId)) return;
+    const phase = callPhaseRef.current;
+    if (phase === 'connecting' || phase === 'active') return;
+    if (incomingCallRef.current && incomingCallRef.current.roomId !== call.roomId) return;
+    setIncomingCall(call);
+    setCallPhase('ringing');
+  }, []);
 
   // Ring + vibrate while an incoming call is waiting
   useEffect(() => {
@@ -43,7 +71,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     stopRingtone();
   }, [incomingCall]);
 
-  // Flash the tab title so a glance at the browser tab bar also signals a call
   useEffect(() => {
     if (!incomingCall) return;
     const original = document.title;
@@ -58,47 +85,41 @@ export function CallProvider({ children }: { children: ReactNode }) {
     };
   }, [incomingCall]);
 
-  useEffect(() => {
-    busyRef.current =
-      callPhase === 'ringing' ||
-      callPhase === 'connecting' ||
-      callPhase === 'active' ||
-      !!incomingCall;
-  }, [callPhase, incomingCall]);
-
+  // Owner socket + incoming-call listener (stable — never re-subscribe per ring)
   useEffect(() => {
     if (!owner?.id) return;
     registerOwnerSocket(owner.id);
-    const unsub = subscribeIncomingCalls((call) => {
-      // Ignore new rings while already in a call
-      if (busyRef.current && incomingCall?.roomId !== call.roomId) return;
-      setIncomingCall(call);
-      setCallPhase('ringing');
-    });
+    const unsub = subscribeIncomingCalls((call) => showIncoming(call));
     return unsub;
-  }, [owner?.id, incomingCall?.roomId]);
+  }, [owner?.id, showIncoming]);
 
-  // Cross-device sync: if another of the owner's devices accepts/declines,
-  // or the caller hangs up / the ring times out, stop ringing on THIS device
-  // too — even if this device never joined the call's own signaling room.
+  // Cross-device sync via owner room broadcasts
   useEffect(() => {
     if (!owner?.id) return;
     const unsub = subscribeCallLifecycle(({ roomId, type }) => {
-      // Only react while merely ringing — never interrupt our own accept
-      // flow (which is already transitioning through 'connecting').
-      if (callPhase !== 'ringing') return;
-      if (!incomingCall || incomingCall.roomId !== roomId) return;
-      setIncomingCall(null);
+      rememberDismissed(dismissedRoomsRef.current, roomId);
+      const current = incomingCallRef.current;
+      const phase = callPhaseRef.current;
+      if (current?.roomId !== roomId && phase !== 'connecting' && phase !== 'active') return;
+
       if (type === 'accepted') {
-        setCallPhase('idle');
-      } else {
-        setCallPhase(type);
+        if (phase === 'ringing') {
+          clearRing('idle');
+        }
+        return;
+      }
+
+      if (phase === 'ringing' || current?.roomId === roomId) {
+        sessionRef.current?.end();
+        sessionRef.current = null;
+        clearRing(type);
         setTimeout(() => setCallPhase('idle'), 1500);
       }
     });
     return unsub;
-  }, [owner?.id, callPhase, incomingCall?.roomId]);
+  }, [owner?.id, clearRing]);
 
+  // Poll fallback — self-heal missed socket events; never resurrect dismissed calls
   useEffect(() => {
     if (!owner?.id) return;
 
@@ -106,27 +127,30 @@ export function CallProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const poll = async () => {
-      // Never poll mid-call (would be pointless/disruptive); do poll while
-      // merely ringing so a missed decline/expire event still self-heals.
-      if (callPhase === 'connecting' || callPhase === 'active') return;
+      const phase = callPhaseRef.current;
+      if (phase === 'connecting' || phase === 'active') return;
+
       try {
         const pending = await api.getPendingCalls();
-        if (pending.length > 0) {
-          const call = pending[0];
-          setIncomingCall({
-            roomId: call.roomId,
-            vehicleName: call.vehicleName,
-            vehicleNumber: call.vehicleNumber,
+        const live = pending.find((c) => !dismissedRoomsRef.current.has(c.roomId));
+        if (live) {
+          showIncoming({
+            roomId: live.roomId,
+            vehicleName: live.vehicleName,
+            vehicleNumber: live.vehicleNumber,
           });
-          setCallPhase('ringing');
-        } else if (callPhase === 'ringing' && incomingCall) {
-          // Server no longer has this call pending — it was handled or
-          // expired and we missed the socket event. Clear the stale ring.
-          setIncomingCall(null);
-          setCallPhase('idle');
+        } else if (phase === 'ringing' && incomingCallRef.current) {
+          clearRing('idle');
         }
       } catch {
-        // silent — backend may be restarting
+        // backend may be waking up
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && owner?.id) {
+        registerOwnerSocket(owner.id);
+        void poll();
       }
     };
 
@@ -134,14 +158,43 @@ export function CallProvider({ children }: { children: ReactNode }) {
       await waitForApiReady();
       if (cancelled) return;
       poll();
-      interval = setInterval(poll, 2500);
+      interval = setInterval(poll, 2000);
     })();
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('qrhorn:incoming-call', onVisible);
 
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('qrhorn:incoming-call', onVisible);
     };
-  }, [owner?.id, callPhase, incomingCall]);
+  }, [owner?.id, showIncoming, clearRing]);
+
+  // Push / notification deep-link: ?view=dashboard&call=roomId
+  useEffect(() => {
+    if (!owner?.id) return;
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('call');
+    if (!roomId) return;
+    registerOwnerSocket(owner.id);
+    void (async () => {
+      try {
+        const pending = await api.getPendingCalls();
+        const match = pending.find((c) => c.roomId === roomId);
+        if (match) {
+          showIncoming({
+            roomId: match.roomId,
+            vehicleName: match.vehicleName,
+            vehicleNumber: match.vehicleNumber,
+          });
+        }
+      } catch {
+        // poll will pick it up
+      }
+    })();
+  }, [owner?.id, showIncoming]);
 
   const attachRemote = useCallback((stream: MediaStream) => {
     if (remoteAudioRef.current) {
@@ -159,10 +212,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const acceptIncomingCall = useCallback(async () => {
-    if (!incomingCall) return;
+    if (!incomingCall || acceptingRef.current) return;
     const roomId = incomingCall.roomId;
+    acceptingRef.current = true;
+    rememberDismissed(dismissedRoomsRef.current, roomId);
     setMuted(false);
     setCallPhase('connecting');
+    setIncomingCall(null);
     try {
       const session = await VoiceCallSession.startIncoming(roomId);
       sessionRef.current = session;
@@ -175,23 +231,33 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
       });
       session.onRemote(attachRemote);
-      setIncomingCall(null);
     } catch (err) {
       console.error('Accept call failed:', err);
-      declineIncomingCall(roomId);
+      await declineIncomingCall(roomId);
       setCallPhase('failed');
       setIncomingCall(null);
       setTimeout(() => setCallPhase('idle'), 2000);
+    } finally {
+      acceptingRef.current = false;
     }
   }, [incomingCall, attachRemote]);
 
   const declineCall = useCallback(() => {
-    if (incomingCall) declineIncomingCall(incomingCall.roomId);
+    if (decliningRef.current) return;
+    decliningRef.current = true;
+    const roomId = incomingCall?.roomId;
+    if (roomId) {
+      rememberDismissed(dismissedRoomsRef.current, roomId);
+      void declineIncomingCall(roomId);
+    }
     sessionRef.current?.end();
     sessionRef.current = null;
     setIncomingCall(null);
     setCallPhase('declined');
-    setTimeout(() => setCallPhase('idle'), 1500);
+    setTimeout(() => {
+      setCallPhase('idle');
+      decliningRef.current = false;
+    }, 1500);
   }, [incomingCall]);
 
   const endActiveCall = useCallback(() => {

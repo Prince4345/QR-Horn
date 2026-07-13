@@ -96,15 +96,27 @@ export function initSocketServer(httpServer: HttpServer) {
       ack?.({ ok: true, status: room.status, reason: room.status });
     });
 
-    socket.on('call:accept', ({ roomId }: { roomId?: string }) => {
+    socket.on('call:accept', ({ roomId }: { roomId?: string }, ack?: (r: { ok: boolean; reason?: string }) => void) => {
       const room = roomId ? getVoiceRoom(roomId) : null;
-      if (!room || room.status !== 'ringing') return;
-      setVoiceRoomStatus(roomId!, 'active');
-      clearPendingCall(room.ownerId, roomId!);
-      io!.to(`voice:${roomId}`).emit('call:accepted', { roomId });
-      // Tell every owner device (e.g. one that's still ringing on another
-      // phone/tab) that this call is being handled elsewhere.
-      io!.to(`owner:${room.ownerId}`).emit('call:accepted', { roomId });
+      if (!room || !roomId) {
+        ack?.({ ok: false, reason: 'not_found' });
+        return;
+      }
+      if (room.status === 'ringing') {
+        setVoiceRoomStatus(roomId, 'active');
+        clearPendingCall(room.ownerId, roomId);
+        io!.to(`voice:${roomId}`).emit('call:accepted', { roomId });
+        io!.to(`owner:${room.ownerId}`).emit('call:accepted', { roomId });
+        ack?.({ ok: true });
+        return;
+      }
+      if (room.status === 'active') {
+        // Idempotent re-accept after reconnect — replay to this socket only
+        socket.emit('call:accepted', { roomId });
+        ack?.({ ok: true });
+        return;
+      }
+      ack?.({ ok: false, reason: room.status });
     });
 
     socket.on('call:decline', ({ roomId }: { roomId?: string }) => {
@@ -155,8 +167,19 @@ export function getIO() {
  */
 export function declineCallByRoom(roomId: string): boolean {
   const room = getJoinableRoom(roomId);
-  if (!room || room.status !== 'ringing') return false;
+  if (!room) return false;
+
+  // Always drop from the pending list so poll/UI cannot resurrect this ring.
   clearPendingCall(room.ownerId, roomId);
+
+  if (room.status !== 'ringing') {
+    if (room.status === 'declined' || room.status === 'expired') {
+      io?.to(`owner:${room.ownerId}`).emit('call:declined', { roomId, reason: room.status });
+      return true;
+    }
+    return false;
+  }
+
   endVoiceRoom(roomId, 'declined');
   clearSignals(roomId);
   io?.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });

@@ -63,11 +63,15 @@ self.addEventListener('notificationclick', (event) => {
       const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of clientList) {
         if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
-          client.postMessage({ type: 'qrhorn:open-dashboard' });
+          client.postMessage({
+            type: 'qrhorn:open-dashboard',
+            roomId: event.notification.data?.roomId ?? null,
+            url,
+          });
           return client.focus();
         }
       }
-      return self.clients.openWindow(url);
+      return self.clients.openWindow(url.startsWith('http') ? url : self.location.origin + url);
     })()
   );
 });

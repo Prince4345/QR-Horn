@@ -169,6 +169,24 @@ function joinErrorMessage(ack: JoinAck): string {
   }
 }
 
+/** Tell server the owner accepted; retries once if the socket hiccups. */
+function emitCallAccept(roomId: string): Promise<void> {
+  const socket = getSocket();
+  const emitOnce = () =>
+    new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Accept timed out')), 8000);
+      socket.emit('call:accept', { roomId }, (res: { ok?: boolean } = {}) => {
+        clearTimeout(timer);
+        if (res.ok) resolve();
+        else reject(new Error('Server rejected accept'));
+      });
+    });
+
+  return ensureConnected(socket).then(() =>
+    emitOnce().catch(() => ensureConnected(socket).then(() => emitOnce()))
+  );
+}
+
 export class VoiceCallSession {
   private socket: Socket;
   private pc: RTCPeerConnection;
@@ -415,7 +433,7 @@ export class VoiceCallSession {
       throw new Error(joinErrorMessage(ack));
     }
 
-    socket.emit('call:accept', { roomId });
+    await emitCallAccept(roomId);
     session.setPhase('connecting');
     return session;
   }
@@ -597,14 +615,13 @@ export function subscribeIncomingCalls(cb: (call: IncomingCall) => void) {
   return () => socket.off('call:incoming', handler);
 }
 
-export function declineIncomingCall(roomId: string) {
+export function declineIncomingCall(roomId: string): Promise<boolean> {
   getSocket().emit('call:decline', { roomId });
-  // HTTP fallback: on mobile the socket is often dead/reconnecting right when
-  // the user taps Decline (background throttling), and a buffered emit may
-  // arrive after the ring already timed out. The HTTP call always lands now.
-  fetch(`${getApiBase()}/api/calls/${encodeURIComponent(roomId)}/decline`, {
+  return fetch(`${getApiBase()}/api/calls/${encodeURIComponent(roomId)}/decline`, {
     method: 'POST',
-  }).catch(() => {});
+  })
+    .then((res) => res.json().then((body: { success?: boolean }) => body.success === true))
+    .catch(() => false);
 }
 
 export type CallLifecycleEvent = { roomId: string; type: 'accepted' | 'declined' | 'ended' };
