@@ -199,23 +199,60 @@ export class VoiceCallSession {
 
   private startConnectWatchdog() {
     if (this.connectWatchdog) return;
-    // At 12s: caller retries with an ICE restart. At 30s: give up with a clear failure.
     this.connectWatchdog = setTimeout(() => {
       if (this.cleaned || this.pc.connectionState === 'connected') return;
+      console.warn(
+        '[call] not connected after 12s — signaling:',
+        this.pc.signalingState,
+        'connection:',
+        this.pc.connectionState,
+        'remoteSet:',
+        this.remoteSet
+      );
       if (this.isCaller) {
-        console.warn('[call] not connected after 12s — attempting ICE restart');
-        this.restartConnection();
+        if (!this.remoteSet) {
+          void this.resendOffer();
+        } else {
+          void this.restartConnection();
+        }
+      } else if (!this.remoteSet) {
+        void this.requestSignalReplay();
       }
       this.connectWatchdog = setTimeout(() => {
         if (this.cleaned) return;
         if (this.pc.connectionState !== 'connected') {
-          console.warn('WebRTC did not connect in time; state:', this.pc.connectionState);
+          console.warn('[call] WebRTC did not connect in time; state:', this.pc.connectionState);
           this.setPhase('failed');
           this.socket.emit('call:end', { roomId: this.roomId });
           this.cleanup();
         }
       }, 18000);
     }, 12000);
+  }
+
+  /** Caller: resend the full offer (not just ICE restart) when no answer arrived. */
+  private async resendOffer() {
+    if (this.cleaned || !this.isCaller) return;
+    try {
+      const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
+      await this.pc.setLocalDescription(offer);
+      this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
+      console.log('[call] re-sent offer (no answer yet)');
+    } catch (err) {
+      console.warn('[call] resend offer failed:', err);
+    }
+  }
+
+  /** Owner: ask the server to replay buffered caller signals (offer + ICE). */
+  private requestSignalReplay(): Promise<void> {
+    return new Promise((resolve) => {
+      this.socket.emit(
+        'call:resync',
+        { roomId: this.roomId, role: this.isCaller ? 'caller' : 'owner' },
+        () => resolve()
+      );
+      setTimeout(resolve, 2000);
+    });
   }
 
   /** Caller-side full retry: new offer with fresh ICE credentials. */
@@ -244,9 +281,10 @@ export class VoiceCallSession {
     if (rid !== this.roomId || !offer || this.cleaned) return;
     // The caller creates offers; it must never apply one (its own, replayed).
     if (this.isCaller) return;
-    // Ignore exact duplicates replayed by the server after a reconnect.
-    if (offer.sdp && offer.sdp === this.lastOfferSdp) return;
+    // Ignore exact duplicates only after remote description is applied.
+    if (offer.sdp && offer.sdp === this.lastOfferSdp && this.remoteSet) return;
     try {
+      console.log('[call] applying remote offer, signaling:', this.pc.signalingState);
       await this.pc.setRemoteDescription(offer);
       this.lastOfferSdp = offer.sdp ?? null;
       this.remoteSet = true;
@@ -258,6 +296,7 @@ export class VoiceCallSession {
       this.startConnectWatchdog();
     } catch (err) {
       console.error('handle offer failed:', err);
+      this.setPhase('failed');
     }
   };
 
@@ -268,8 +307,9 @@ export class VoiceCallSession {
     // Only valid while we have a local offer outstanding; duplicates would
     // throw InvalidStateError and previously tore the whole call down.
     if (this.pc.signalingState !== 'have-local-offer') return;
-    if (answer.sdp && answer.sdp === this.lastAnswerSdp) return;
+    if (answer.sdp && answer.sdp === this.lastAnswerSdp && this.remoteSet) return;
     try {
+      console.log('[call] applying remote answer, signaling:', this.pc.signalingState);
       await this.pc.setRemoteDescription(answer);
       this.lastAnswerSdp = answer.sdp ?? null;
       this.remoteSet = true;
@@ -419,17 +459,19 @@ export class VoiceCallSession {
       throw micError(err);
     }
 
-    // Tell the caller to send its WebRTC offer before we finish joining —
-    // the server buffers the offer and replays it when we join the voice room.
-    await notifyCallAccept(socket, roomId);
-
+    // Join the voice room FIRST so we're listening before the caller sends SDP.
     const ack = await joinRoom(socket, roomId, 'owner');
     if (!ack.ok) {
       session.cleanup();
       throw new Error(joinErrorMessage(ack));
     }
 
+    await notifyCallAccept(socket, roomId);
+
+    // Caller may have already emitted an offer during accept — pull it from buffer.
+    await session.requestSignalReplay();
     session.setPhase('connecting');
+    session.startConnectWatchdog();
     return session;
   }
 
@@ -537,14 +579,14 @@ export class VoiceCallSession {
   }
 
   private onReconnect = () => {
-    // Render's polling transport can drop and reconnect mid-call.
-    // Rejoin the voice room so signaling keeps flowing.
     if (this.cleaned) return;
     console.log('[call] socket reconnected — rejoining room', this.roomId);
     this.socket.emit(
       'call:join',
       { roomId: this.roomId, role: this.isCaller ? 'caller' : 'owner' },
-      () => {}
+      () => {
+        void this.requestSignalReplay();
+      }
     );
   };
 

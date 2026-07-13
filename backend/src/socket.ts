@@ -77,7 +77,6 @@ export function initSocketServer(httpServer: HttpServer) {
 
       if (room.status === 'ended' || room.status === 'declined' || room.status === 'expired') {
         ack?.({ ok: false, status: room.status, reason: room.status });
-        // Still join briefly so they can receive any last events, but report failure
         socket.join(`voice:${roomId}`);
         socket.emit(room.status === 'declined' || room.status === 'expired' ? 'call:declined' : 'call:ended', {
           roomId,
@@ -88,8 +87,6 @@ export function initSocketServer(httpServer: HttpServer) {
 
       socket.join(`voice:${roomId}`);
       replaySignalsToSocket(socket, roomId, role);
-      // If the owner already accepted before this socket joined (fast-answer
-      // race, or a reconnect), tell the caller right away so it sends its offer.
       if (room.status === 'active' && role === 'caller') {
         socket.emit('call:accepted', { roomId });
       }
@@ -111,12 +108,24 @@ export function initSocketServer(httpServer: HttpServer) {
         return;
       }
       if (room.status === 'active') {
-        // Idempotent re-accept after reconnect — replay to this socket only
         socket.emit('call:accepted', { roomId });
         ack?.({ ok: true });
         return;
       }
       ack?.({ ok: false, reason: room.status });
+    });
+
+    /** Re-push buffered SDP/ICE to a peer that joined late or reconnected. */
+    socket.on('call:resync', (payload: { roomId?: string; role?: string }, ack?: (r: { ok: boolean }) => void) => {
+      const roomId = payload?.roomId;
+      const role: SignalRole = payload?.role === 'owner' ? 'owner' : 'caller';
+      if (!roomId || !getVoiceRoom(roomId)) {
+        ack?.({ ok: false });
+        return;
+      }
+      socket.join(`voice:${roomId}`);
+      replaySignalsToSocket(socket, roomId, role);
+      ack?.({ ok: true });
     });
 
     socket.on('call:decline', ({ roomId }: { roomId?: string }) => {
