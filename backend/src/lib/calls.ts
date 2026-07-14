@@ -1,4 +1,4 @@
-/** In-app WebRTC voice is always available; Twilio is used for SMS only. */
+/** In-app WebRTC voice is always available; SMS uses Fast2SMS (India) or Twilio. */
 export function isVoiceConfigured(): boolean {
   return true;
 }

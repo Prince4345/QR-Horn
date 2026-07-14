@@ -1,5 +1,5 @@
 import { prisma } from './prisma.js';
-import { formatE164 } from './phone.js';
+import { formatE164, formatIndianMobile } from './phone.js';
 
 const REASON_TITLES: Record<string, string> = {
   move: 'Please move your vehicle',
@@ -10,7 +10,22 @@ const REASON_TITLES: Record<string, string> = {
   call: 'Someone is trying to call you',
 };
 
-export function isSmsConfigured(): boolean {
+function buildAlertBody(payload: {
+  reason: string;
+  vehicleName: string;
+  vehicleNumber: string;
+  theftMode: boolean;
+}): string {
+  const reason = REASON_TITLES[payload.reason] ?? payload.reason;
+  const prefix = payload.theftMode ? 'QRHorn THEFT ALERT' : 'QRHorn';
+  return `${prefix}: ${payload.vehicleName} (${payload.vehicleNumber}) — ${reason}`;
+}
+
+export function isFast2SmsConfigured(): boolean {
+  return !!process.env.FAST2SMS_API_KEY?.trim();
+}
+
+export function isTwilioConfigured(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&
     process.env.TWILIO_AUTH_TOKEN &&
@@ -18,32 +33,50 @@ export function isSmsConfigured(): boolean {
   );
 }
 
-export async function sendSmsToOwner(
-  ownerId: string,
-  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean }
-): Promise<boolean> {
-  if (!isSmsConfigured()) return false;
+export function isSmsConfigured(): boolean {
+  return isFast2SmsConfigured() || isTwilioConfigured();
+}
 
-  const owner = await prisma.owner.findUnique({
-    where: { id: ownerId },
-    select: { phone: true },
-  });
+async function sendViaFast2Sms(to: string, body: string): Promise<boolean> {
+  const apiKey = process.env.FAST2SMS_API_KEY!.trim();
+  const route = process.env.FAST2SMS_ROUTE?.trim() || 'q';
 
-  if (!owner?.phone?.trim()) {
-    console.warn(`No phone number for owner ${ownerId} — SMS skipped`);
+  try {
+    const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+      method: 'POST',
+      headers: {
+        authorization: apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        message: body,
+        route,
+        numbers: to,
+        language: 'english',
+      }),
+    });
+
+    const data = (await res.json().catch(() => null)) as {
+      return?: boolean;
+      message?: string | string[];
+      status_code?: number;
+    } | null;
+
+    if (!res.ok || data?.return === false) {
+      const detail = Array.isArray(data?.message) ? data.message.join(', ') : data?.message;
+      console.error('Fast2SMS failed:', detail ?? res.status);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Fast2SMS error:', err);
     return false;
   }
+}
 
-  const to = formatE164(owner.phone);
-  if (!to) {
-    console.warn(`Invalid owner phone for ${ownerId} — SMS skipped`);
-    return false;
-  }
-
-  const reason = REASON_TITLES[payload.reason] ?? payload.reason;
-  const prefix = payload.theftMode ? 'QRHorn THEFT ALERT' : 'QRHorn';
-  const body = `${prefix}: ${payload.vehicleName} (${payload.vehicleNumber}) — ${reason}`;
-
+async function sendViaTwilio(to: string, body: string): Promise<boolean> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID!;
   const authToken = process.env.TWILIO_AUTH_TOKEN!;
   const from = process.env.TWILIO_PHONE_NUMBER!;
@@ -75,4 +108,40 @@ export async function sendSmsToOwner(
     console.error('Twilio SMS error:', err);
     return false;
   }
+}
+
+export async function sendSmsToOwner(
+  ownerId: string,
+  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean }
+): Promise<boolean> {
+  if (!isSmsConfigured()) return false;
+
+  const owner = await prisma.owner.findUnique({
+    where: { id: ownerId },
+    select: { phone: true },
+  });
+
+  if (!owner?.phone?.trim()) {
+    console.warn(`No phone number for owner ${ownerId} — SMS skipped`);
+    return false;
+  }
+
+  const body = buildAlertBody(payload);
+
+  if (isFast2SmsConfigured()) {
+    const indian = formatIndianMobile(owner.phone);
+    if (!indian) {
+      console.warn(`Invalid Indian mobile for owner ${ownerId} — Fast2SMS skipped`);
+      return false;
+    }
+    return sendViaFast2Sms(indian, body);
+  }
+
+  const to = formatE164(owner.phone);
+  if (!to) {
+    console.warn(`Invalid owner phone for ${ownerId} — SMS skipped`);
+    return false;
+  }
+
+  return sendViaTwilio(to, body);
 }

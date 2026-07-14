@@ -61,7 +61,68 @@ Leave `VITE_API_URL` **unset** in production so the app uses the same origin as 
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` | AI sticker backgrounds |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | SMS alerts |
+| `FAST2SMS_API_KEY` | SMS via Fast2SMS (India, cheap) — see section below |
+| `FAST2SMS_ROUTE` | Fast2SMS route (default `q` = Quick SMS) |
+| `TWILIO_*` | SMS via Twilio (global, optional alternative) |
+
+### SMS with Fast2SMS (India — recommended)
+
+QRHorn uses SMS only as a **fallback** when push notifications fail. Voice calls stay free (WebRTC).
+
+#### Step 1 — Create account
+
+1. Go to [fast2sms.com](https://www.fast2sms.com) → **Sign up**
+2. Verify your email and log in
+
+#### Step 2 — Add wallet balance
+
+1. Dashboard → **Add Funds** (minimum is usually small, e.g. ₹100)
+2. Quick SMS (`route: q`) is pay-as-you-go (~₹0.15–0.25 per SMS depending on plan)
+
+#### Step 3 — Get API key
+
+1. Dashboard → **Dev API**
+2. Copy your **Authorization Key** (enabled by default)
+3. Keep it secret — treat it like a password
+
+#### Step 4 — (Optional) Lock API to Render IP
+
+1. Dev API → **Security** tab → enable IP whitelist
+2. Add your Render service outbound IP (or skip for testing)
+3. If enabled, only requests from that IP work
+
+#### Step 5 — Set env vars on Render
+
+| Variable | Value |
+|----------|--------|
+| `FAST2SMS_API_KEY` | Your Authorization Key from Dev API |
+| `FAST2SMS_ROUTE` | `q` (Quick SMS — default, no DLT template needed for testing) |
+
+Remove or leave empty any `TWILIO_*` vars if you are not using Twilio. **Fast2SMS is used when `FAST2SMS_API_KEY` is set.**
+
+Redeploy after saving env vars.
+
+#### Step 6 — Owner phone number format
+
+Owners must save an **Indian 10-digit mobile** in Profile (e.g. `9876543210` or `+91 9876543210`).
+
+#### Step 7 — Test
+
+1. Open your live site → log in as owner → Profile → add mobile number
+2. From another device, scan the QR → **Send Notification**
+3. Owner should receive an SMS like: `QRHorn: HONDA (HR60N7731) — Please move your vehicle`
+4. Check Render **Logs** if SMS fails (`Fast2SMS failed:` lines)
+
+#### Troubleshooting
+
+| Error | Fix |
+|-------|-----|
+| `Invalid Authentication` | Wrong or disabled API key — regenerate in Dev API |
+| `Insufficient balance` | Top up wallet on Fast2SMS |
+| SMS skipped in logs | Owner has no phone or not a valid 10-digit Indian number |
+| IP blocked | Disable Security whitelist or add Render IP |
+
+**Note:** For high-volume or commercial use in India, DLT registration (sender ID + template) may be required. Quick route `q` is fine for personal / low-volume QRHorn use.
 
 ### Voice calls across networks (TURN)
 
