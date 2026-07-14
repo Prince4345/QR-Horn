@@ -219,6 +219,7 @@ export class VoiceCallSession {
   private acceptResolve: (() => void) | null = null;
   private acceptReject: ((e: Error) => void) | null = null;
   private acceptTimeout: ReturnType<typeof setTimeout> | null = null;
+  private acceptPoll: ReturnType<typeof setInterval> | null = null;
   private acceptHandled = false;
   private isCaller = false;
   private iceQueue: RTCIceCandidateInit[] = [];
@@ -454,8 +455,15 @@ export class VoiceCallSession {
   };
 
   private onDeclined = ({ roomId: rid }: { roomId: string }) => {
-    if (rid !== this.roomId) return;
+    if (rid !== this.roomId || this.cleaned) return;
+    this.acceptHandled = true;
+    if (this.acceptTimeout) {
+      clearTimeout(this.acceptTimeout);
+      this.acceptTimeout = null;
+    }
+    this.stopAcceptPoll();
     this.setPhase('declined');
+    this.acceptResolve?.();
     this.cleanup();
   };
 
@@ -503,6 +511,31 @@ export class VoiceCallSession {
     return session;
   }
 
+  private stopAcceptPoll() {
+    if (this.acceptPoll) {
+      clearInterval(this.acceptPoll);
+      this.acceptPoll = null;
+    }
+  }
+
+  private startAcceptPoll() {
+    if (!this.isCaller || this.acceptPoll) return;
+    this.acceptPoll = setInterval(() => {
+      if (this.cleaned || this.acceptHandled) {
+        this.stopAcceptPoll();
+        return;
+      }
+      void fetch(`${getApiBase()}/api/calls/${encodeURIComponent(this.roomId)}/status`)
+        .then((r) => r.json())
+        .then((body: { status?: string }) => {
+          if (body.status === 'declined' || body.status === 'expired' || body.status === 'gone') {
+            this.onDeclined({ roomId: this.roomId });
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+  }
+
   waitUntilAccepted(timeoutMs = 55_000): Promise<void> {
     if (this.acceptPromise) return this.acceptPromise;
 
@@ -514,8 +547,10 @@ export class VoiceCallSession {
       }
       this.acceptResolve = resolve;
       this.acceptReject = reject;
+      this.startAcceptPoll();
       this.acceptTimeout = setTimeout(() => {
         if (this.acceptHandled) return;
+        this.stopAcceptPoll();
         this.socket.emit('call:end', { roomId: this.roomId });
         this.cleanup();
         this.setPhase('failed');
@@ -791,6 +826,7 @@ export class VoiceCallSession {
     this.cleaned = true;
     this.clearConnectWatchdog();
     this.stopSignalResync();
+    this.stopAcceptPoll();
     if (this.acceptTimeout) {
       clearTimeout(this.acceptTimeout);
       this.acceptTimeout = null;

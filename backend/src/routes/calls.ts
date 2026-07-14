@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { declineCallByRoom } from '../socket.js';
+import { getJoinableRoom } from '../lib/voiceRooms.js';
 
 const router = Router();
+
+router.get('/:roomId/status', (req, res) => {
+  const room = getJoinableRoom(req.params.roomId);
+  res.json({ status: room?.status ?? 'gone' });
+});
 
 /**
  * Decline a ringing call by roomId. Intentionally unauthenticated: it's

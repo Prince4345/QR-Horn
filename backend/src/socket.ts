@@ -47,6 +47,7 @@ export function initSocketServer(httpServer: HttpServer) {
     const event = reason === 'expired' ? 'call:declined' : 'call:ended';
     const room = getJoinableRoom(roomId);
     io?.to(`voice:${roomId}`).emit(event, { roomId, reason });
+    io?.to(`caller:${roomId}`).emit(event, { roomId, reason });
     if (room) io?.to(`owner:${room.ownerId}`).emit(event, { roomId, reason });
   });
 
@@ -78,6 +79,7 @@ export function initSocketServer(httpServer: HttpServer) {
       if (room.status === 'ended' || room.status === 'declined' || room.status === 'expired') {
         ack?.({ ok: false, status: room.status, reason: room.status });
         socket.join(`voice:${roomId}`);
+        if (role === 'caller') socket.join(`caller:${roomId}`);
         socket.emit(room.status === 'declined' || room.status === 'expired' ? 'call:declined' : 'call:ended', {
           roomId,
           reason: room.status,
@@ -86,6 +88,7 @@ export function initSocketServer(httpServer: HttpServer) {
       }
 
       socket.join(`voice:${roomId}`);
+      if (role === 'caller') socket.join(`caller:${roomId}`);
       replaySignalsToSocket(socket, roomId, role);
       if (room.status === 'active' && role === 'caller') {
         socket.emit('call:accepted', { roomId });
@@ -124,6 +127,7 @@ export function initSocketServer(httpServer: HttpServer) {
         return;
       }
       socket.join(`voice:${roomId}`);
+      if (role === 'caller') socket.join(`caller:${roomId}`);
       replaySignalsToSocket(socket, roomId, role);
       ack?.({ ok: true });
     });
@@ -184,6 +188,8 @@ export function declineCallByRoom(roomId: string): boolean {
 
   if (room.status !== 'ringing') {
     if (room.status === 'declined' || room.status === 'expired') {
+      io?.to(`caller:${roomId}`).emit('call:declined', { roomId, reason: room.status });
+      io?.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: room.status });
       io?.to(`owner:${room.ownerId}`).emit('call:declined', { roomId, reason: room.status });
       return true;
     }
@@ -192,6 +198,7 @@ export function declineCallByRoom(roomId: string): boolean {
 
   endVoiceRoom(roomId, 'declined');
   clearSignals(roomId);
+  io?.to(`caller:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });
   io?.to(`voice:${roomId}`).emit('call:declined', { roomId, reason: 'declined' });
   io?.to(`owner:${room.ownerId}`).emit('call:declined', { roomId, reason: 'declined' });
   return true;
