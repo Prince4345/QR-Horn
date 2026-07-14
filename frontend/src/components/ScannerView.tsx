@@ -342,15 +342,28 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-md relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 rounded-2xl sm:rounded-[40px] shadow-2xl overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
+      className={`w-full relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 shadow-2xl overflow-hidden flex flex-col ${
+        status === 'calling'
+          ? 'rounded-2xl sm:rounded-[40px] min-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-w-md sm:min-h-0'
+          : 'max-w-md rounded-2xl sm:rounded-[40px] overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
+      }`}
     >
-      <div className="p-5 sm:p-8 flex flex-col h-full relative z-10">
-        {!scanCode && (
+      <div className={`flex flex-col h-full relative z-10 ${status === 'calling' ? 'p-4 sm:p-8 flex-1' : 'p-5 sm:p-8'}`}>
+        {!scanCode && status !== 'calling' && (
           <button onClick={handleBack} className="text-sm text-slate-400 hover:text-white transition-colors mb-4 self-start">
             &larr; Back
           </button>
         )}
 
+        {status === 'calling' ? (
+          <div className="text-center pb-4 mb-2 border-b border-white/10">
+            <p className="text-white/40 text-[10px] tracking-widest uppercase mb-0.5">Calling</p>
+            <p className="text-lg font-semibold leading-tight">{scanData.vehicleName}</p>
+            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-md bg-white/10 font-mono text-xs tracking-wider text-slate-300">
+              {scanData.vehicleNumber}
+            </span>
+          </div>
+        ) : (
         <div className="text-center mb-8">
           <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-4" />
           <p className="text-white/40 text-xs tracking-widest uppercase mb-1">
@@ -368,8 +381,9 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
             </span>
           </div>
         </div>
+        )}
 
-        <div>
+        <div className={status === 'calling' ? 'flex-1 flex flex-col min-h-0' : ''}>
           <AnimatePresence mode="wait">
             {status === 'idle' && (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-6">
@@ -437,47 +451,68 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
             )}
 
             {status === 'calling' && (
-              <motion.div key="calling" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 bg-blue-500/30 rounded-full animate-ping" />
-                  <div className="relative bg-blue-500/20 p-4 rounded-full border border-blue-500/30">
-                    <Phone className="w-8 h-8 text-blue-400 animate-pulse" />
+              <motion.div
+                key="calling"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col flex-1 w-full min-h-0"
+              >
+                <div className="flex-1 flex flex-col items-center justify-center text-center px-1 py-4 sm:py-8">
+                  <div className="relative mb-5 sm:mb-6">
+                    {callPhase === 'active' ? (
+                      <div className="relative bg-green-500/20 p-5 sm:p-6 rounded-full border border-green-500/30">
+                        <Phone className="w-10 h-10 sm:w-12 sm:h-12 text-green-400" />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="absolute inset-0 bg-blue-500/30 rounded-full animate-ping" />
+                        <div className="relative bg-blue-500/20 p-5 sm:p-6 rounded-full border border-blue-500/30">
+                          <Phone className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400 animate-pulse" />
+                        </div>
+                      </>
+                    )}
                   </div>
+
+                  <h3 className="text-2xl sm:text-xl font-semibold text-white mb-2">
+                    {callPhase === 'active' ? 'Call Connected' : callPhase === 'connecting' ? 'Connecting…' : 'Ringing Owner…'}
+                  </h3>
+
+                  {callPhase === 'active' ? (
+                    <CallTimer className="block text-5xl sm:text-4xl font-bold text-green-400 mb-4 tabular-nums" />
+                  ) : callPhase === 'connecting' ? (
+                    <p className="text-lg text-blue-300 mb-4 animate-pulse">Syncing audio…</p>
+                  ) : null}
+
+                  <p className="text-sm text-white/50 leading-relaxed max-w-[280px] sm:max-w-xs mx-auto">
+                    {callPhase === 'active'
+                      ? 'Speak through your device. No phone numbers are shared.'
+                      : callPhase === 'connecting'
+                        ? 'Owner accepted — setting up secure voice.'
+                        : 'Waiting for the owner to accept in their dashboard.'}
+                  </p>
                 </div>
-                <h3 className="text-xl font-medium text-white mb-2">
-                  {callPhase === 'active' ? 'Call Connected' : callPhase === 'connecting' ? 'Connecting...' : 'Ringing Owner...'}
-                </h3>
-                {callPhase === 'active' ? (
-                  <CallTimer className="block text-3xl text-green-400 mb-3" />
-                ) : callPhase === 'connecting' ? (
-                  <p className="text-lg text-blue-300 mb-3 animate-pulse">Connected — syncing audio…</p>
-                ) : null}
-                <p className="text-slate-400 mb-6">
-                  {callPhase === 'active'
-                    ? 'Voice call in progress — speak through your device. No phone numbers are shared.'
-                    : callPhase === 'connecting'
-                      ? 'Owner accepted — connecting secure voice…'
-                      : 'Anonymous in-app call. The owner gets an alert and can Accept in their dashboard.'}
-                </p>
-                {callPhase === 'active' || callPhase === 'connecting' ? (
+
+                <div className="w-full pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-3">
+                  {(callPhase === 'active' || callPhase === 'connecting') && (
+                    <button
+                      onClick={toggleMute}
+                      className={`w-full min-h-[52px] py-4 rounded-2xl font-semibold text-base flex items-center justify-center gap-2 transition-colors active:scale-[0.98] ${
+                        muted
+                          ? 'bg-amber-500/25 text-amber-200 border border-amber-500/40'
+                          : 'bg-white/10 text-white border border-white/10'
+                      }`}
+                    >
+                      {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                      {muted ? 'Unmute microphone' : 'Mute microphone'}
+                    </button>
+                  )}
                   <button
-                    onClick={toggleMute}
-                    className={`px-6 py-2 rounded-full font-medium text-sm mr-3 inline-flex items-center gap-2 transition-colors ${
-                      muted
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-white/10 text-white hover:bg-white/15'
-                    }`}
+                    onClick={handleEndCall}
+                    className="w-full min-h-[52px] py-4 rounded-2xl bg-red-600 hover:bg-red-500 active:bg-red-500 text-white font-semibold text-base active:scale-[0.98] transition-colors"
                   >
-                    {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    {muted ? 'Unmute' : 'Mute'}
+                    End Call
                   </button>
-                ) : null}
-                <button
-                  onClick={handleEndCall}
-                  className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium text-sm"
-                >
-                  End Call
-                </button>
+                </div>
                 <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
               </motion.div>
             )}
