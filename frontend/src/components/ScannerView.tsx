@@ -18,7 +18,7 @@ import {
   MicOff,
 } from 'lucide-react';
 import { api, type ContactReason, type ContactMethod, type ScanData } from '../lib/api';
-import { VoiceCallSession, type CallPhase, advanceCallPhase } from '../lib/voiceCall';
+import { VoiceCallSession, type CallPhase, advanceCallPhase, preflightMicPermission } from '../lib/voiceCall';
 import QrCameraScanner from './QrCameraScanner';
 import CallTimer from './CallTimer';
 
@@ -159,32 +159,34 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     setMuted(false);
 
     try {
+      await preflightMicPermission();
       const result = await api.initiateCall(contactMethod, contactId);
-      const session = await VoiceCallSession.beginOutgoing(result.roomId);
+      const session = await VoiceCallSession.beginOutgoing(result.roomId, {
+        onPhase: (phase) => {
+          setCallPhase((current) => advanceCallPhase(current, phase));
+          if (phase === 'failed') {
+            setError('Could not connect the call. This usually means the network needs a TURN relay — try again, or use the same Wi‑Fi to test.');
+            callSessionRef.current = null;
+            setStatus('idle');
+            setCallPhase('idle');
+          }
+          if (phase === 'declined' || phase === 'ended') {
+            setSuccessMessage(phase === 'declined' ? 'Owner declined the call.' : 'Call ended.');
+            callSessionRef.current = null;
+            setStatus('success');
+          }
+        },
+        onRemote: (stream) => {
+          const el = remoteAudioRef.current;
+          if (!el) return;
+          el.srcObject = stream;
+          el.muted = false;
+          el.volume = 1;
+          void el.play().catch(() => {});
+          setCallPhase('active');
+        },
+      });
       callSessionRef.current = session;
-
-      session.onPhase((phase) => {
-        setCallPhase((current) => advanceCallPhase(current, phase));
-        if (phase === 'failed') {
-          setError('Could not connect the call. This usually means the network needs a TURN relay — try again, or use the same Wi‑Fi to test.');
-          callSessionRef.current = null;
-          setStatus('idle');
-          setCallPhase('idle');
-        }
-        if (phase === 'declined' || phase === 'ended') {
-          setSuccessMessage(phase === 'declined' ? 'Owner declined the call.' : 'Call ended.');
-          callSessionRef.current = null;
-          setStatus('success');
-        }
-      });
-
-      session.onRemote((stream) => {
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = stream;
-          remoteAudioRef.current.play().catch(() => {});
-        }
-        setCallPhase('active');
-      });
 
       await session.waitUntilAccepted();
     } catch (err) {

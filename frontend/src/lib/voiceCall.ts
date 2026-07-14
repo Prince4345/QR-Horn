@@ -162,6 +162,23 @@ const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   autoGainControl: true,
 };
 
+export async function preflightMicPermission(): Promise<void> {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: AUDIO_CONSTRAINTS,
+      video: false,
+    });
+    stream.getTracks().forEach((t) => t.stop());
+  } catch (err) {
+    throw micError(err);
+  }
+}
+
+export type CallSessionHooks = {
+  onRemote?: (stream: MediaStream) => void;
+  onPhase?: (phase: CallPhase) => void;
+};
+
 export function advanceCallPhase(current: CallPhase, next: CallPhase): CallPhase {
   if (current === 'active' && (next === 'connecting' || next === 'ringing')) return current;
   return next;
@@ -197,6 +214,7 @@ export class VoiceCallSession {
   private localStream: MediaStream | null = null;
   private onPhaseChange?: (phase: CallPhase) => void;
   private onRemoteStream?: (stream: MediaStream) => void;
+  private pendingRemoteStream: MediaStream | null = null;
   private acceptPromise: Promise<void> | null = null;
   private acceptResolve: (() => void) | null = null;
   private acceptReject: ((e: Error) => void) | null = null;
@@ -268,7 +286,7 @@ export class VoiceCallSession {
   private async resendOffer() {
     if (this.cleaned || !this.isCaller) return;
     try {
-      await this.ensureSenderTrack();
+      await this.prepareCallerAudio();
       if (this.pc.signalingState === 'have-local-offer' && this.pc.localDescription) {
         const offer = {
           type: this.pc.localDescription.type,
@@ -305,7 +323,7 @@ export class VoiceCallSession {
   private async restartConnection() {
     if (this.cleaned || !this.isCaller) return;
     try {
-      await this.ensureSenderTrack();
+      await this.prepareCallerAudio();
       const offer = await this.pc.createOffer({ iceRestart: true, offerToReceiveAudio: true });
       await this.pc.setLocalDescription(offer);
       this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
@@ -421,7 +439,7 @@ export class VoiceCallSession {
       this.acceptTimeout = null;
     }
     try {
-      await this.ensureSenderTrack();
+      await this.prepareCallerAudio();
       const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
       await this.pc.setLocalDescription(offer);
       this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
@@ -456,7 +474,7 @@ export class VoiceCallSession {
     this.bindSocket();
   }
 
-  static async beginOutgoing(roomId: string): Promise<VoiceCallSession> {
+  static async beginOutgoing(roomId: string, hooks?: CallSessionHooks): Promise<VoiceCallSession> {
     const socket = getSocket();
     if (!socket.connected) {
       await new Promise<void>((resolve, reject) => {
@@ -472,12 +490,8 @@ export class VoiceCallSession {
     const iceServers = await loadIceServers();
     const session = new VoiceCallSession(socket, roomId, iceServers);
     session.isCaller = true;
-    try {
-      await session.initLocalAudio();
-    } catch (err) {
-      session.cleanup();
-      throw micError(err);
-    }
+    if (hooks?.onRemote) session.onRemote(hooks.onRemote);
+    if (hooks?.onPhase) session.onPhase(hooks.onPhase);
 
     const ack = await joinRoom(socket, roomId, 'caller');
     if (!ack.ok) {
@@ -512,7 +526,7 @@ export class VoiceCallSession {
     return this.acceptPromise;
   }
 
-  static async startIncoming(roomId: string): Promise<VoiceCallSession> {
+  static async startIncoming(roomId: string, hooks?: CallSessionHooks): Promise<VoiceCallSession> {
     const socket = getSocket();
     if (!socket.connected) {
       await new Promise<void>((resolve, reject) => {
@@ -527,6 +541,8 @@ export class VoiceCallSession {
 
     const iceServers = await loadIceServers();
     const session = new VoiceCallSession(socket, roomId, iceServers);
+    if (hooks?.onRemote) session.onRemote(hooks.onRemote);
+    if (hooks?.onPhase) session.onPhase(hooks.onPhase);
 
     // Join the voice room FIRST so we receive the caller's offer immediately.
     const ack = await joinRoom(socket, roomId, 'owner');
@@ -562,6 +578,22 @@ export class VoiceCallSession {
 
   onRemote(cb: (stream: MediaStream) => void) {
     this.onRemoteStream = cb;
+    if (this.pendingRemoteStream) {
+      cb(this.pendingRemoteStream);
+      this.pendingRemoteStream = null;
+    }
+  }
+
+  private deliverRemoteStream(stream: MediaStream) {
+    stream.getAudioTracks().forEach((t) => {
+      t.enabled = true;
+    });
+    if (this.onRemoteStream) {
+      this.onRemoteStream(stream);
+    } else {
+      this.pendingRemoteStream = stream;
+    }
+    this.setPhase('active');
   }
 
   /** Mute/unmute the local microphone. Returns the new muted state. */
@@ -579,6 +611,30 @@ export class VoiceCallSession {
 
   private setPhase(phase: CallPhase) {
     this.onPhaseChange?.(phase);
+  }
+
+  private async prepareCallerAudio(): Promise<void> {
+    if (!this.isCaller) {
+      await this.ensureSenderTrack();
+      return;
+    }
+
+    // Mobile mics often go silent while ringing — always capture fresh audio for the offer.
+    this.localStream?.getTracks().forEach((t) => t.stop());
+    for (const sender of [...this.pc.getSenders()]) {
+      if (sender.track?.kind === 'audio') {
+        this.pc.removeTrack(sender);
+      }
+    }
+
+    this.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: AUDIO_CONSTRAINTS,
+      video: false,
+    });
+    const track = this.localStream.getAudioTracks()[0];
+    track.enabled = true;
+    this.pc.addTrack(track, this.localStream);
+    console.log('[call] caller mic prepared:', track.label, track.readyState, 'muted:', track.muted);
   }
 
   private async ensureSenderTrack(): Promise<void> {
@@ -632,11 +688,20 @@ export class VoiceCallSession {
 
   private setupPeer() {
     this.pc.ontrack = (event) => {
-      const [stream] = event.streams;
-      if (stream) {
-        this.onRemoteStream?.(stream);
-        this.setPhase('active');
-      }
+      const stream =
+        event.streams[0] ?? (event.track ? new MediaStream([event.track]) : null);
+      if (!stream) return;
+      const audio = event.track ?? stream.getAudioTracks()[0];
+      console.log(
+        '[call] remote audio:',
+        audio?.label,
+        audio?.readyState,
+        'muted:',
+        audio?.muted,
+        'role:',
+        this.isCaller ? 'caller' : 'owner'
+      );
+      this.deliverRemoteStream(stream);
     };
 
     this.pc.onicecandidate = (event) => {

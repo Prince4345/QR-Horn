@@ -202,10 +202,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
   }, [owner?.id, showIncoming]);
 
   const attachRemote = useCallback((stream: MediaStream) => {
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = stream;
-      remoteAudioRef.current.play().catch(() => {});
-    }
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    el.srcObject = stream;
+    el.muted = false;
+    el.volume = 1;
+    void el.play().catch(() => {});
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -224,18 +226,19 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallPhase('connecting');
     setIncomingCall(null);
     try {
-      const session = await VoiceCallSession.startIncoming(roomId);
+      const session = await VoiceCallSession.startIncoming(roomId, {
+        onRemote: attachRemote,
+        onPhase: (phase) => {
+          setCallPhase((current) => advanceCallPhase(current, phase));
+          if (phase === 'failed' || phase === 'ended' || phase === 'declined') {
+            sessionRef.current = null;
+            setIncomingCall(null);
+            setTimeout(() => setCallPhase('idle'), 1500);
+          }
+        },
+      });
       rememberDismissed(dismissedRoomsRef.current, roomId);
       sessionRef.current = session;
-      session.onPhase((phase) => {
-        setCallPhase((current) => advanceCallPhase(current, phase));
-        if (phase === 'failed' || phase === 'ended' || phase === 'declined') {
-          sessionRef.current = null;
-          setIncomingCall(null);
-          setTimeout(() => setCallPhase('idle'), 1500);
-        }
-      });
-      session.onRemote(attachRemote);
     } catch (err) {
       console.error('Accept call failed:', err);
       sessionRef.current?.end();
