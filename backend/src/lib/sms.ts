@@ -10,6 +10,10 @@ const REASON_TITLES: Record<string, string> = {
   call: 'Someone is trying to call you',
 };
 
+function sanitizeDltPart(value: string): string {
+  return value.replace(/\|/g, ' ').trim();
+}
+
 function buildAlertBody(payload: {
   reason: string;
   vehicleName: string;
@@ -21,8 +25,38 @@ function buildAlertBody(payload: {
   return `${prefix}: ${payload.vehicleName} (${payload.vehicleNumber}) — ${reason}`;
 }
 
+/** DLT template vars for: QRHorn: {#var#} ({#var#}) - {#var#}. */
+function buildDltVariables(payload: {
+  reason: string;
+  vehicleName: string;
+  vehicleNumber: string;
+  theftMode: boolean;
+}): string {
+  const reason = REASON_TITLES[payload.reason] ?? payload.reason;
+  const line = payload.theftMode ? `THEFT - ${reason}` : reason;
+  return [
+    sanitizeDltPart(payload.vehicleName),
+    sanitizeDltPart(payload.vehicleNumber),
+    sanitizeDltPart(line),
+  ].join('|');
+}
+
+function fast2SmsRoute(): string {
+  return process.env.FAST2SMS_ROUTE?.trim().toLowerCase() || 'dlt';
+}
+
 export function isFast2SmsConfigured(): boolean {
-  return !!process.env.FAST2SMS_API_KEY?.trim();
+  const apiKey = process.env.FAST2SMS_API_KEY?.trim();
+  if (!apiKey) return false;
+
+  if (fast2SmsRoute() === 'dlt') {
+    return !!(
+      process.env.FAST2SMS_SENDER_ID?.trim() &&
+      process.env.FAST2SMS_MESSAGE_ID?.trim()
+    );
+  }
+
+  return true;
 }
 
 export function isTwilioConfigured(): boolean {
@@ -37,9 +71,28 @@ export function isSmsConfigured(): boolean {
   return isFast2SmsConfigured() || isTwilioConfigured();
 }
 
-async function sendViaFast2Sms(to: string, body: string): Promise<boolean> {
+async function sendViaFast2Sms(
+  to: string,
+  payload: { reason: string; vehicleName: string; vehicleNumber: string; theftMode: boolean }
+): Promise<boolean> {
   const apiKey = process.env.FAST2SMS_API_KEY!.trim();
-  const route = process.env.FAST2SMS_ROUTE?.trim() || 'q';
+  const route = fast2SmsRoute();
+
+  const body =
+    route === 'dlt'
+      ? {
+          route: 'dlt',
+          sender_id: process.env.FAST2SMS_SENDER_ID!.trim(),
+          message: process.env.FAST2SMS_MESSAGE_ID!.trim(),
+          variables_values: buildDltVariables(payload),
+          numbers: to,
+        }
+      : {
+          route: 'q',
+          message: buildAlertBody(payload),
+          numbers: to,
+          language: 'english',
+        };
 
   try {
     const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
@@ -49,12 +102,7 @@ async function sendViaFast2Sms(to: string, body: string): Promise<boolean> {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({
-        message: body,
-        route,
-        numbers: to,
-        language: 'english',
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = (await res.json().catch(() => null)) as {
@@ -126,15 +174,13 @@ export async function sendSmsToOwner(
     return false;
   }
 
-  const body = buildAlertBody(payload);
-
   if (isFast2SmsConfigured()) {
     const indian = formatIndianMobile(owner.phone);
     if (!indian) {
       console.warn(`Invalid Indian mobile for owner ${ownerId} — Fast2SMS skipped`);
       return false;
     }
-    return sendViaFast2Sms(indian, body);
+    return sendViaFast2Sms(indian, payload);
   }
 
   const to = formatE164(owner.phone);
@@ -143,5 +189,5 @@ export async function sendSmsToOwner(
     return false;
   }
 
-  return sendViaTwilio(to, body);
+  return sendViaTwilio(to, buildAlertBody(payload));
 }
