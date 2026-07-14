@@ -7,6 +7,7 @@ import {
   declineIncomingCall,
   type IncomingCall,
   type CallPhase,
+  advanceCallPhase,
 } from '../lib/voiceCall';
 import { useAuth } from './AuthContext';
 import { api, waitForApiReady } from '../lib/api';
@@ -227,7 +228,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       rememberDismissed(dismissedRoomsRef.current, roomId);
       sessionRef.current = session;
       session.onPhase((phase) => {
-        setCallPhase(phase);
+        setCallPhase((current) => advanceCallPhase(current, phase));
         if (phase === 'failed' || phase === 'ended' || phase === 'declined') {
           sessionRef.current = null;
           setIncomingCall(null);

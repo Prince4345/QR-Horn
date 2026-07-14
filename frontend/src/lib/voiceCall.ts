@@ -156,6 +156,17 @@ function micError(err: unknown): Error {
   }
 }
 
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+};
+
+export function advanceCallPhase(current: CallPhase, next: CallPhase): CallPhase {
+  if (current === 'active' && (next === 'connecting' || next === 'ringing')) return current;
+  return next;
+}
+
 function joinErrorMessage(ack: JoinAck): string {
   switch (ack.reason) {
     case 'declined':
@@ -257,6 +268,7 @@ export class VoiceCallSession {
   private async resendOffer() {
     if (this.cleaned || !this.isCaller) return;
     try {
+      await this.ensureSenderTrack();
       if (this.pc.signalingState === 'have-local-offer' && this.pc.localDescription) {
         const offer = {
           type: this.pc.localDescription.type,
@@ -293,6 +305,7 @@ export class VoiceCallSession {
   private async restartConnection() {
     if (this.cleaned || !this.isCaller) return;
     try {
+      await this.ensureSenderTrack();
       const offer = await this.pc.createOffer({ iceRestart: true, offerToReceiveAudio: true });
       await this.pc.setLocalDescription(offer);
       this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
@@ -340,6 +353,7 @@ export class VoiceCallSession {
       this.lastOfferSdp = offer.sdp ?? null;
       this.remoteSet = true;
       await this.flushIceQueue();
+      await this.ensureSenderTrack();
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
       const payload = {
@@ -407,6 +421,7 @@ export class VoiceCallSession {
       this.acceptTimeout = null;
     }
     try {
+      await this.ensureSenderTrack();
       const offer = await this.pc.createOffer({ offerToReceiveAudio: true });
       await this.pc.setLocalDescription(offer);
       this.socket.emit('webrtc:offer', { roomId: this.roomId, offer });
@@ -566,9 +581,39 @@ export class VoiceCallSession {
     this.onPhaseChange?.(phase);
   }
 
+  private async ensureSenderTrack(): Promise<void> {
+    let track = this.localStream?.getAudioTracks()[0];
+    if (track?.readyState === 'live') {
+      track.enabled = true;
+      console.log('[call] local mic live, enabled:', track.enabled);
+      return;
+    }
+
+    console.warn('[call] local mic not live — re-acquiring before SDP');
+    this.localStream?.getTracks().forEach((t) => t.stop());
+    this.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: AUDIO_CONSTRAINTS,
+      video: false,
+    });
+    track = this.localStream.getAudioTracks()[0];
+    track.enabled = true;
+
+    const sender = this.pc.getSenders().find((s) => s.track?.kind === 'audio');
+    if (sender) {
+      await sender.replaceTrack(track);
+    } else {
+      this.pc.addTrack(track, this.localStream);
+    }
+    console.log('[call] local mic re-acquired, state:', track.readyState);
+  }
+
   private async initLocalAudio() {
-    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    this.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: AUDIO_CONSTRAINTS,
+      video: false,
+    });
     for (const track of this.localStream.getTracks()) {
+      track.enabled = true;
       this.pc.addTrack(track, this.localStream);
     }
   }
@@ -633,6 +678,7 @@ export class VoiceCallSession {
       console.log('[call] iceConnectionState:', state);
       if (state === 'connected' || state === 'completed') {
         this.clearConnectWatchdog();
+        this.stopSignalResync();
         this.setPhase('active');
       } else if (state === 'failed') {
         // Try an ICE restart once before giving up

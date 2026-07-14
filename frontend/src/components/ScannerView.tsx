@@ -18,7 +18,7 @@ import {
   MicOff,
 } from 'lucide-react';
 import { api, type ContactReason, type ContactMethod, type ScanData } from '../lib/api';
-import { VoiceCallSession, type CallPhase } from '../lib/voiceCall';
+import { VoiceCallSession, type CallPhase, advanceCallPhase } from '../lib/voiceCall';
 import QrCameraScanner from './QrCameraScanner';
 import CallTimer from './CallTimer';
 
@@ -164,7 +164,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       callSessionRef.current = session;
 
       session.onPhase((phase) => {
-        setCallPhase(phase);
+        setCallPhase((current) => advanceCallPhase(current, phase));
         if (phase === 'failed') {
           setError('Could not connect the call. This usually means the network needs a TURN relay — try again, or use the same Wi‑Fi to test.');
           callSessionRef.current = null;
@@ -447,6 +447,8 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                 </h3>
                 {callPhase === 'active' ? (
                   <CallTimer className="block text-3xl text-green-400 mb-3" />
+                ) : callPhase === 'connecting' ? (
+                  <p className="text-lg text-blue-300 mb-3 animate-pulse">Connected — syncing audio…</p>
                 ) : null}
                 <p className="text-slate-400 mb-6">
                   {callPhase === 'active'
@@ -455,7 +457,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                       ? 'Owner accepted — connecting secure voice…'
                       : 'Anonymous in-app call. The owner gets an alert and can Accept in their dashboard.'}
                 </p>
-                {callPhase === 'active' && (
+                {callPhase === 'active' || callPhase === 'connecting' ? (
                   <button
                     onClick={toggleMute}
                     className={`px-6 py-2 rounded-full font-medium text-sm mr-3 inline-flex items-center gap-2 transition-colors ${
@@ -467,7 +469,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                     {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                     {muted ? 'Unmute' : 'Mute'}
                   </button>
-                )}
+                ) : null}
                 <button
                   onClick={handleEndCall}
                   className="px-6 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-medium text-sm"
