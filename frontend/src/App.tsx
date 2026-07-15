@@ -17,7 +17,7 @@ function getInitialState() {
   const code = parseScanCodeFromPath(window.location.pathname);
   const params = new URLSearchParams(window.location.search);
   const chat = params.get('chat');
-  const wantsDashboard = !code && (params.get('view') === 'dashboard' || !!chat);
+  const wantsDashboard = !code && params.get('view') === 'dashboard';
   const wantsMessages = wantsDashboard && (!!chat || params.get('tab') === 'messages');
   return {
     scanCode: code ?? undefined,
@@ -48,10 +48,15 @@ function AppNav() {
       setScanCode(undefined);
     }
 
-    if (chat) {
+    if (chat && params.get('view') === 'dashboard') {
       setDashboardChatId(chat);
       setDashboardTab('messages');
       setView('dashboard');
+    } else if (chat && (code || params.get('view') === 'scanner')) {
+      setView('scanner');
+      if (code) setScanCode(code);
+    } else if (chat) {
+      setView('scanner');
     } else if (params.get('view') === 'dashboard') {
       setView('dashboard');
       if (params.get('tab') === 'messages') setDashboardTab('messages');

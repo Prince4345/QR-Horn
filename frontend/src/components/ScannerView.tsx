@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Car,
@@ -26,12 +26,23 @@ import ChatPanel from './ChatPanel';
 import {
   type ChatSession,
   buildChatUrl,
+  buildScannerChatHomeUrl,
+  chatSessionIdFromLocation,
+  countOwnerUnread,
+  getLatestOwnerMessage,
   joinChatAsScanner,
+  loadPendingScannerChat,
+  loadScannerLastSeen,
   loadScannerToken,
+  notifyScannerOwnerReply,
+  requestScannerNotificationPermission,
+  savePendingScannerChat,
+  saveScannerLastSeen,
   saveScannerToken,
   subscribeChatMessages,
   subscribeChatSessionUpdates,
 } from '../lib/chatClient';
+import { playMessageSound } from '../lib/messageSound';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -65,8 +76,65 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   const [scannerToken, setScannerToken] = useState<string | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
+  const [ownerReplyBanner, setOwnerReplyBanner] = useState<{ preview: string; count: number } | null>(null);
+  const [landingChatRestore, setLandingChatRestore] = useState<ChatSession | null>(null);
+  const [landingChatLoading, setLandingChatLoading] = useState(false);
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const callSessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const chatOpenRef = useRef(false);
+  const chatSessionIdRef = useRef<string | null>(null);
+  const lastSeenRef = useRef<string | null>(null);
+
+  chatOpenRef.current = chatOpen;
+  chatSessionIdRef.current = chatSessionId;
+
+  const markChatSeen = useCallback((session: ChatSession) => {
+    saveScannerLastSeen(session.id, session.messages);
+    const seen = loadScannerLastSeen(session.id);
+    lastSeenRef.current = seen;
+    setLastSeenAt(seen);
+    if (countOwnerUnread(session, seen) === 0) {
+      setOwnerReplyBanner(null);
+    }
+  }, []);
+
+  const openChatPanel = useCallback(() => {
+    if (chatSession) markChatSeen(chatSession);
+    setChatOpen(true);
+    setOwnerReplyBanner(null);
+  }, [chatSession, markChatSeen]);
+
+  const closeChatPanel = useCallback(() => {
+    setChatOpen(false);
+    if (chatSessionId) {
+      window.history.replaceState(null, '', buildChatUrl(chatSessionId));
+    }
+  }, [chatSessionId]);
+
+  const handleIncomingSession = useCallback((session: ChatSession, fromOwnerMessage?: boolean) => {
+    if (session.id !== chatSessionIdRef.current) return;
+    setChatSession(session);
+
+    const unread = countOwnerUnread(session, lastSeenRef.current);
+    if (unread <= 0 || chatOpenRef.current) return;
+
+    const latest = getLatestOwnerMessage(session);
+    if (!latest) return;
+
+    setOwnerReplyBanner({ preview: latest.body, count: unread });
+
+    if (document.hidden) {
+      notifyScannerOwnerReply({
+        sessionId: session.id,
+        vehicleName: session.vehicleName,
+        preview: latest.body,
+        url: buildChatUrl(session.id),
+      });
+    } else if (fromOwnerMessage) {
+      playMessageSound();
+    }
+  }, []);
 
   const toggleMute = () => {
     const session = callSessionRef.current;
@@ -76,7 +144,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     setMuted(next);
   };
 
-  const resetContact = () => {
+  const resetVehicleContact = () => {
     setScanData(null);
     setError(null);
     setStatus('idle');
@@ -91,32 +159,93 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     setActiveCallRoomId(null);
   };
 
-  const attachChatSession = (sessionId: string, token: string, session: ChatSession) => {
+  const resetContact = () => {
+    resetVehicleContact();
+    setChatSession(null);
+    setChatSessionId(null);
+    setScannerToken(null);
+    setOwnerReplyBanner(null);
+    setLandingChatRestore(null);
+    lastSeenRef.current = null;
+  };
+
+  const attachChatSession = (
+    sessionId: string,
+    token: string,
+    session: ChatSession,
+    opts?: { open?: boolean; contactMethod?: ContactMethod; contactId?: string }
+  ) => {
     saveScannerToken(sessionId, token);
+    savePendingScannerChat({
+      sessionId,
+      returnPath: window.location.pathname + window.location.search,
+      vehicleId: session.vehicleId,
+      vehicleName: session.vehicleName,
+      vehicleNumber: session.vehicleNumber,
+      contactMethod: opts?.contactMethod ?? contactMethod ?? undefined,
+      contactId: opts?.contactId ?? contactId ?? undefined,
+    });
     setChatSessionId(sessionId);
     setScannerToken(token);
     setChatSession(session);
-    setChatOpen(true);
+    lastSeenRef.current = loadScannerLastSeen(sessionId);
+    setLastSeenAt(lastSeenRef.current);
+    const shouldOpen = opts?.open !== false;
+    setChatOpen(shouldOpen);
+    if (shouldOpen) markChatSeen(session);
+    else {
+      const unread = countOwnerUnread(session, lastSeenRef.current);
+      if (unread > 0) {
+        const latest = getLatestOwnerMessage(session);
+        setOwnerReplyBanner({
+          preview: latest?.body ?? 'New message from owner',
+          count: unread,
+        });
+      }
+    }
     window.history.replaceState(null, '', buildChatUrl(sessionId));
     void joinChatAsScanner(sessionId, token);
+    void requestScannerNotificationPermission();
   };
 
   const restoreChatFromUrl = async (vehicleId: string) => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('chat');
     if (!sessionId) return;
+    if (chatSessionIdRef.current === sessionId) return;
     const token = loadScannerToken(sessionId);
     if (!token) return;
     setChatLoading(true);
     try {
       const session = await api.getScannerChat(sessionId, token);
       if (session.vehicleId !== vehicleId) return;
-      attachChatSession(sessionId, token, session);
-      setChatOpen(true);
+      attachChatSession(sessionId, token, session, { open: false });
     } catch {
       // expired or invalid
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  const resumeLandingChat = async () => {
+    const session = landingChatRestore ?? chatSession;
+    if (!session || !chatSessionId || !scannerToken) return;
+    setLandingChatLoading(true);
+    try {
+      const pending = loadPendingScannerChat();
+      if (pending?.contactMethod === 'qr' && pending.contactId) {
+        window.history.replaceState(null, '', buildChatUrl(chatSessionId, `/scan/${encodeURIComponent(pending.contactId)}`));
+        await loadByQr(pending.contactId);
+      } else if (pending?.contactMethod === 'plate' && pending.contactId) {
+        setPlateInput(pending.contactId);
+        await loadByPlate(pending.contactId);
+      } else {
+        window.history.replaceState(null, '', buildChatUrl(chatSessionId));
+      }
+      openChatPanel();
+      setLandingChatRestore(null);
+    } finally {
+      setLandingChatLoading(false);
     }
   };
 
@@ -131,9 +260,10 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
         callRoomId: opts?.callRoomId ?? activeCallRoomId ?? undefined,
         scannerToken: existingToken ?? scannerToken ?? undefined,
       });
-      attachChatSession(result.sessionId, result.scannerToken, result.session);
-      setChatOpen(true);
-      setChatOpen(true);
+      attachChatSession(result.sessionId, result.scannerToken, result.session, {
+        contactMethod: contactMethod ?? undefined,
+        contactId: contactId ?? undefined,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start chat');
     } finally {
@@ -145,6 +275,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     if (!chatSessionId || !scannerToken) throw new Error('Chat not ready');
     const result = await api.sendScannerChatMessage(chatSessionId, scannerToken, body, isQuickReply);
     setChatSession(result.session);
+    markChatSeen(result.session);
   };
 
   const loadByQr = async (code: string) => {
@@ -213,22 +344,71 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   }, [scanData?.vehicleId]);
 
   useEffect(() => {
+    if (scanData || scanCode || loading) return;
+    const sessionId = chatSessionIdFromLocation();
+    if (!sessionId) {
+      setLandingChatRestore(null);
+      return;
+    }
+    const token = loadScannerToken(sessionId);
+    if (!token) return;
+
+    let cancelled = false;
+    setLandingChatLoading(true);
+    void api
+      .getScannerChat(sessionId, token)
+      .then((session) => {
+        if (cancelled) return;
+        setChatSessionId(sessionId);
+        setScannerToken(token);
+        setChatSession(session);
+        setLandingChatRestore(session);
+        lastSeenRef.current = loadScannerLastSeen(sessionId);
+        setLastSeenAt(lastSeenRef.current);
+        void joinChatAsScanner(sessionId, token);
+        const unread = countOwnerUnread(session, lastSeenRef.current);
+        if (unread > 0) {
+          const latest = getLatestOwnerMessage(session);
+          setOwnerReplyBanner({
+            preview: latest?.body ?? 'New message from owner',
+            count: unread,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLandingChatRestore(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLandingChatLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scanData, scanCode, loading]);
+
+  useEffect(() => {
     if (!chatSessionId || !scannerToken) return;
-    const unsubMsg = subscribeChatMessages(({ sessionId, session }) => {
-      if (sessionId === chatSessionId) setChatSession(session);
+    const unsubMsg = subscribeChatMessages(({ sessionId, message, session }) => {
+      if (sessionId !== chatSessionId) return;
+      handleIncomingSession(session, message.senderRole === 'OWNER');
     });
     const unsubSession = subscribeChatSessionUpdates((session) => {
-      if (session.id === chatSessionId) setChatSession(session);
+      if (session.id !== chatSessionId) return;
+      handleIncomingSession(session);
     });
     const poll = setInterval(() => {
-      void api.getScannerChat(chatSessionId, scannerToken).then(setChatSession).catch(() => {});
+      void api
+        .getScannerChat(chatSessionId, scannerToken)
+        .then((session) => handleIncomingSession(session))
+        .catch(() => {});
     }, 3000);
     return () => {
       unsubMsg();
       unsubSession();
       clearInterval(poll);
     };
-  }, [chatSessionId, scannerToken]);
+  }, [chatSessionId, scannerToken, handleIncomingSession]);
 
   const handleNotify = async () => {
     if (!selectedReason || !contactMethod || !contactId) return;
@@ -263,8 +443,10 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       setActiveCallRoomId(result.roomId);
       if (result.chatSessionId && result.scannerToken) {
         const chat = await api.getScannerChat(result.chatSessionId, result.scannerToken);
-        attachChatSession(result.chatSessionId, result.scannerToken, chat);
-        setChatOpen(true);
+        attachChatSession(result.chatSessionId, result.scannerToken, chat, {
+          contactMethod: contactMethod ?? undefined,
+          contactId: contactId ?? undefined,
+        });
       }
       const session = await VoiceCallSession.beginOutgoing(result.roomId, {
         onPhase: (phase) => {
@@ -313,9 +495,30 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   };
 
   const handleBack = () => {
-    resetContact();
+    if (chatSession && chatSessionId) {
+      savePendingScannerChat({
+        sessionId: chatSessionId,
+        returnPath: window.location.pathname + window.location.search,
+        vehicleId: chatSession.vehicleId,
+        vehicleName: chatSession.vehicleName,
+        vehicleNumber: chatSession.vehicleNumber,
+        contactMethod: contactMethod ?? undefined,
+        contactId: contactId ?? undefined,
+      });
+      window.history.replaceState(null, '', buildScannerChatHomeUrl(chatSessionId));
+    } else if (scanCode) {
+      window.history.replaceState(null, '', '/');
+    }
+    resetVehicleContact();
     setPlateInput('');
   };
+
+  const scannerUnreadCount =
+    chatSession && !chatOpen ? countOwnerUnread(chatSession, lastSeenAt) : 0;
+  const landingUnreadCount =
+    landingChatRestore && !scanData
+      ? countOwnerUnread(landingChatRestore, lastSeenAt ?? loadScannerLastSeen(landingChatRestore.id))
+      : 0;
 
   // Landing — QR scan instructions + vehicle number lookup
   if (!scanData && !loading && !scanCode) {
@@ -347,6 +550,52 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
         </div>
 
         <div className="p-5 sm:p-8">
+          {(landingChatRestore || landingChatLoading) && (
+            <div className="mb-6 p-4 rounded-2xl bg-violet-600/15 border border-violet-500/30">
+              {landingChatLoading && !landingChatRestore ? (
+                <div className="flex items-center gap-3 text-violet-100/80 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  Checking for an open chat…
+                </div>
+              ) : landingChatRestore ? (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-violet-600/30 flex items-center justify-center shrink-0">
+                      <MessageSquare className="w-5 h-5 text-violet-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-white">
+                        {landingUnreadCount > 0 ? 'Owner replied' : 'Continue your chat'}
+                      </p>
+                      <p className="text-xs text-violet-100/70 truncate">
+                        {landingChatRestore.vehicleName} · {landingChatRestore.vehicleNumber}
+                      </p>
+                      {landingUnreadCount > 0 && ownerReplyBanner && (
+                        <p className="text-sm text-violet-100/90 mt-1 line-clamp-2">
+                          “{ownerReplyBanner.preview}”
+                        </p>
+                      )}
+                    </div>
+                    {landingUnreadCount > 0 && (
+                      <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-[11px] font-bold flex items-center justify-center shrink-0">
+                        {landingUnreadCount > 9 ? '9+' : landingUnreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void resumeLandingChat()}
+                    disabled={landingChatLoading}
+                    className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    {landingChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                    {landingUnreadCount > 0 ? 'Open chat & read reply' : 'Resume chat'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
             {entryTab === 'qr' ? (
               <motion.div key="qr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
@@ -498,7 +747,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           <div className="flex items-center gap-3 pb-3 mb-2 border-b border-white/10 shrink-0">
             <button
               type="button"
-              onClick={() => setChatOpen(false)}
+              onClick={closeChatPanel}
               className="p-2 -ml-1 rounded-full hover:bg-white/10 text-slate-300"
               aria-label="Back"
             >
@@ -527,7 +776,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setChatOpen(false)}
+                      onClick={closeChatPanel}
                       className="mt-3 text-xs text-slate-500 hover:text-slate-300 shrink-0 md:hidden"
                     >
                       Back to notify / call options
@@ -535,6 +784,39 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                   </div>
                 ) : (
                 <>
+                {ownerReplyBanner && scannerUnreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={openChatPanel}
+                    className="p-4 rounded-2xl bg-violet-600/20 border border-violet-500/40 text-left transition-colors hover:bg-violet-600/30"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-violet-600/30 flex items-center justify-center shrink-0">
+                        <MessageSquare className="w-5 h-5 text-violet-200" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-violet-100">Owner replied</p>
+                        <p className="text-sm text-white/80 mt-0.5 line-clamp-2">“{ownerReplyBanner.preview}”</p>
+                        <p className="text-xs text-violet-200/60 mt-1">Tap to open chat</p>
+                      </div>
+                      <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-[11px] font-bold flex items-center justify-center shrink-0">
+                        {scannerUnreadCount > 9 ? '9+' : scannerUnreadCount}
+                      </span>
+                    </div>
+                  </button>
+                )}
+
+                {chatSession && !ownerReplyBanner && (
+                  <button
+                    type="button"
+                    onClick={openChatPanel}
+                    className="p-3 rounded-2xl bg-violet-600/10 border border-violet-500/20 text-violet-100 font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Resume chat with owner
+                  </button>
+                )}
+
                 <div className="space-y-4 mb-8">
                   <p className="text-white/60 text-sm text-center mb-6">Select a reason to contact the owner anonymously.</p>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -581,12 +863,17 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                     <span className="text-[10px] font-normal opacity-70">In-app call like Instagram — no phone number needed</span>
                   </button>
                   <button
-                    onClick={() => void startChat()}
+                    onClick={() => (chatSession ? openChatPanel() : void startChat())}
                     disabled={chatLoading}
-                    className="w-full py-4 bg-violet-600 hover:bg-violet-600/90 disabled:opacity-50 text-white rounded-3xl font-bold flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-violet-600 hover:bg-violet-600/90 disabled:opacity-50 text-white rounded-3xl font-bold flex items-center justify-center gap-2 relative"
                   >
                     {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
-                    Chat Owner
+                    {chatSession ? (scannerUnreadCount > 0 ? 'Open chat — new reply' : 'Resume chat') : 'Chat Owner'}
+                    {scannerUnreadCount > 0 && (
+                      <span className="absolute top-2 right-3 min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center">
+                        {scannerUnreadCount > 9 ? '9+' : scannerUnreadCount}
+                      </span>
+                    )}
                   </button>
                   {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                   <div className="mt-6 flex justify-center items-center gap-2 text-white/30 text-[10px] tracking-widest uppercase">
@@ -654,11 +941,16 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                   {chatSession && (
                     <button
                       type="button"
-                      onClick={() => setChatOpen(true)}
-                      className="w-full min-h-[44px] py-3 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-100 font-medium flex items-center justify-center gap-2"
+                      onClick={openChatPanel}
+                      className="w-full min-h-[44px] py-3 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-100 font-medium flex items-center justify-center gap-2 relative"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      Open chat
+                      {scannerUnreadCount > 0 ? 'Open chat — new reply' : 'Open chat'}
+                      {scannerUnreadCount > 0 && (
+                        <span className="min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center">
+                          {scannerUnreadCount > 9 ? '9+' : scannerUnreadCount}
+                        </span>
+                      )}
                     </button>
                   )}
                   {chatOpen && chatSession && (

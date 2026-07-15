@@ -44,6 +44,18 @@ export type IncomingChat = {
 };
 
 const SCANNER_TOKEN_KEY = (sessionId: string) => `qrhorn-chat-token:${sessionId}`;
+const SCANNER_LAST_SEEN_KEY = (sessionId: string) => `qrhorn-chat-seen:${sessionId}`;
+const SCANNER_PENDING_KEY = 'qrhorn-scanner-pending-chat';
+
+export type PendingScannerChat = {
+  sessionId: string;
+  returnPath: string;
+  vehicleId: string;
+  vehicleName: string;
+  vehicleNumber: string;
+  contactMethod?: 'qr' | 'plate';
+  contactId?: string;
+};
 
 export function saveScannerToken(sessionId: string, token: string) {
   try {
@@ -66,6 +78,111 @@ export function buildChatUrl(sessionId: string, basePath?: string): string {
   const url = new URL(path, window.location.origin);
   url.searchParams.set('chat', sessionId);
   return url.pathname + url.search;
+}
+
+/** Scanner home deep-link — keeps chat out of owner dashboard routing. */
+export function buildScannerChatHomeUrl(sessionId: string): string {
+  return `/?view=scanner&chat=${encodeURIComponent(sessionId)}`;
+}
+
+export function saveScannerLastSeen(sessionId: string, messages: ChatMessage[]) {
+  const last = messages[messages.length - 1];
+  if (!last) return;
+  try {
+    localStorage.setItem(SCANNER_LAST_SEEN_KEY(sessionId), last.createdAt);
+  } catch {
+    // private mode
+  }
+}
+
+export function loadScannerLastSeen(sessionId: string): string | null {
+  try {
+    return localStorage.getItem(SCANNER_LAST_SEEN_KEY(sessionId));
+  } catch {
+    return null;
+  }
+}
+
+export function getLatestOwnerMessage(session: ChatSession): ChatMessage | null {
+  for (let i = session.messages.length - 1; i >= 0; i--) {
+    if (session.messages[i].senderRole === 'OWNER') return session.messages[i];
+  }
+  return null;
+}
+
+export function countOwnerUnread(session: ChatSession, lastSeenAt: string | null): number {
+  if (!lastSeenAt) {
+    return session.messages.filter((m) => m.senderRole === 'OWNER').length;
+  }
+  return session.messages.filter((m) => m.senderRole === 'OWNER' && m.createdAt > lastSeenAt).length;
+}
+
+export function savePendingScannerChat(pending: PendingScannerChat) {
+  try {
+    localStorage.setItem(SCANNER_PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // private mode
+  }
+}
+
+export function loadPendingScannerChat(): PendingScannerChat | null {
+  try {
+    const raw = localStorage.getItem(SCANNER_PENDING_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as PendingScannerChat;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingScannerChat() {
+  try {
+    localStorage.removeItem(SCANNER_PENDING_KEY);
+  } catch {
+    // private mode
+  }
+}
+
+export async function requestScannerNotificationPermission(): Promise<boolean> {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  try {
+    return (await Notification.requestPermission()) === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+export function notifyScannerOwnerReply(payload: {
+  sessionId: string;
+  vehicleName: string;
+  preview: string;
+  url?: string;
+}) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!document.hidden) return;
+
+  const body = payload.preview.length > 120 ? `${payload.preview.slice(0, 117)}…` : payload.preview;
+  const targetUrl = payload.url ?? buildScannerChatHomeUrl(payload.sessionId);
+
+  try {
+    const notification = new Notification(`${payload.vehicleName} replied`, {
+      body,
+      tag: `scanner-chat-${payload.sessionId}`,
+      icon: '/favicon.ico',
+    });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+      if (window.location.pathname + window.location.search !== targetUrl) {
+        window.history.replaceState(null, '', targetUrl);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    };
+  } catch {
+    // ignored
+  }
 }
 
 /** Owner dashboard deep-link — switches view + opens Messages tab. */
