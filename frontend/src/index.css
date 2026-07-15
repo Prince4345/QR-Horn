@@ -21,43 +21,76 @@ body {
   }
 }
 
-/* html5-qrcode injects its own DOM — tame it for mobile */
-#qrhorn-qr-reader,
-#sticker-studio-qr-reader {
+/* html5-qrcode — full-screen scanner (GPay / Lens style) */
+.qr-camera-fullscreen,
+.qr-camera-fullscreen #qrhorn-qr-reader,
+.qr-camera-fullscreen #sticker-studio-qr-reader {
   width: 100% !important;
-  min-height: 240px;
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
-#qrhorn-qr-reader video,
-#sticker-studio-qr-reader video {
+.qr-camera-fullscreen #qrhorn-qr-reader__scan_region,
+.qr-camera-fullscreen #sticker-studio-qr-reader__scan_region {
   width: 100% !important;
-  height: auto !important;
-  max-height: 55dvh;
-  object-fit: cover;
-  border-radius: 1rem;
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
-#qrhorn-qr-reader__dashboard,
-#sticker-studio-qr-reader__dashboard {
+.qr-camera-fullscreen video {
   width: 100% !important;
+  height: 100% !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
 }
 
-#qrhorn-qr-reader__dashboard_section_csr,
-#sticker-studio-qr-reader__dashboard_section_csr {
+.qr-camera-fullscreen #qrhorn-qr-reader__dashboard,
+.qr-camera-fullscreen #sticker-studio-qr-reader__dashboard {
   width: 100% !important;
+  height: 100% !important;
+}
+
+.qr-camera-fullscreen #qrhorn-qr-reader__dashboard_section_csr,
+.qr-camera-fullscreen #sticker-studio-qr-reader__dashboard_section_csr {
+  width: 100% !important;
+  height: 100% !important;
   padding: 0 !important;
+  border: none !important;
 }
 
+/* Hide library scan-box borders — custom overlay handles the frame */
+.qr-camera-fullscreen #qrhorn-qr-reader__scan_region img,
+.qr-camera-fullscreen #sticker-studio-qr-reader__scan_region img {
+  display: none !important;
+}
+
+@keyframes qr-scan-sweep {
+  0%,
+  100% {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(120px);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+}
+
+.qr-scan-line {
+  animation: qr-scan-sweep 2.2s ease-in-out infinite;
+}
+
+/* Legacy fallback if reader is not inside fullscreen wrapper */
 #qrhorn-qr-reader__scan_region,
 #sticker-studio-qr-reader__scan_region {
   width: 100% !important;
-  min-height: 240px;
-}
-
-#qrhorn-qr-reader__scan_region video,
-#sticker-studio-qr-reader__scan_region video {
-  width: 100% !important;
-  object-fit: cover;
 }
 
 .custom-scroll {
