@@ -20,14 +20,19 @@ function isFinderZone(row: number, col: number, size: number): boolean {
   return inCorner(row, col) || inCorner(row, col - (size - 7)) || inCorner(row - (size - 7), col);
 }
 
+/** Center badge half-width as a fraction of the rendered QR canvas size. */
+const LOGO_HALF_RATIO = 0.165;
+/** Inner padding inside the white badge (fraction of half-width). */
+const LOGO_INNER_PAD_RATIO = 0.03;
+
 /** Modules cleared for the center logo (matches drawCenterLogo badge; safe with H correction). */
-function logoModuleHalfExtent(count: number): number {
-  return count * 0.13;
+function logoModuleHalfExtent(count: number, margin: number): number {
+  return (count + margin * 2) * LOGO_HALF_RATIO;
 }
 
-function isLogoZone(row: number, col: number, count: number): boolean {
+function isLogoZone(row: number, col: number, count: number, margin: number): boolean {
   const c = count / 2;
-  const r = logoModuleHalfExtent(count);
+  const r = logoModuleHalfExtent(count, margin);
   return Math.abs(row + 0.5 - c) <= r && Math.abs(col + 0.5 - c) <= r;
 }
 
@@ -117,24 +122,30 @@ async function drawCenterLogo(
   logoImageDataUrl?: string | null
 ) {
   const cx = size / 2;
-  const half = size * 0.13;
-  const pad = half * 0.07;
+  const half = size * LOGO_HALF_RATIO;
+  const pad = half * LOGO_INNER_PAD_RATIO;
+  const box = half * 2;
+  const inner = box - pad * 2;
 
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(cx - half, cx - half, half * 2, half * 2, half * 0.2);
+  ctx.roundRect(cx - half, cx - half, box, box, half * 0.18);
   ctx.fill();
   ctx.restore();
 
   if (logoImageDataUrl) {
     try {
       const img = await loadImage(logoImageDataUrl);
-      const inner = half * 2 - pad * 2;
-      const scale = Math.min(inner / img.width, inner / img.height);
+      const scale = Math.max(inner / img.width, inner / img.height) * 1.12;
       const w = img.width * scale;
       const h = img.height * scale;
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(cx - inner / 2, cx - inner / 2, inner, inner, inner * 0.12);
+      ctx.clip();
       ctx.drawImage(img, cx - w / 2, cx - h / 2, w, h);
+      ctx.restore();
       return;
     } catch {
       // fall through to letter
@@ -210,7 +221,7 @@ async function renderPhotoQr(
     for (let col = 0; col < moduleCount; col++) {
       if (!qr.modules.get(row, col)) continue;
       if (isFinderZone(row, col, moduleCount)) continue;
-      if (isLogoZone(row, col, moduleCount)) continue;
+      if (isLogoZone(row, col, moduleCount, margin)) continue;
       const [r, g, b] = sampleAt(col, row);
       const lum = luminance(r, g, b);
       const darken = lum > 110 ? 0.55 : 0.15;
@@ -290,7 +301,7 @@ function renderStyledQr(
     for (let col = 0; col < moduleCount; col++) {
       if (!qr.modules.get(row, col)) continue;
       if (isFinderZone(row, col, moduleCount)) continue;
-      if (isLogoZone(row, col, moduleCount)) continue;
+      if (isLogoZone(row, col, moduleCount, margin)) continue;
       drawModule(ctx, (col + margin) * cell, (row + margin) * cell, cell, preset.moduleShape);
     }
   }
