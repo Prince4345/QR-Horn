@@ -1,6 +1,5 @@
-import html2canvas from 'html2canvas';
-
 import { APP_NAME } from './brand';
+
 export const STICKER_PREVIEW_WIDTH_PX = 300;
 
 /** Print size: 3×4 inches at 300 DPI. */
@@ -15,6 +14,7 @@ export const STICKER_PREVIEW_HEIGHT_PX = Math.round(STICKER_PREVIEW_WIDTH_PX * (
 export const STICKER_EXPORT_SCALE = STICKER_PRINT_WIDTH_PX / STICKER_PREVIEW_WIDTH_PX;
 
 export async function captureStickerForPrint(element: HTMLElement) {
+  const { default: html2canvas } = await import('html2canvas');
   return html2canvas(element, {
     scale: STICKER_EXPORT_SCALE,
     backgroundColor: null,

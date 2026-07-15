@@ -3,15 +3,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import ScannerView from './components/ScannerView';
-import Dashboard from './components/Dashboard';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import IncomingCallModal from './components/IncomingCallModal';
 import IncomingChatModal from './components/IncomingChatModal';
+import ViewLoader from './components/ViewLoader';
 import { LayoutDashboard, MessageSquare, QrCode } from 'lucide-react';
 import { parseScanCodeFromPath } from './lib/scanUrl';
 import { useAuth } from './context/AuthContext';
 import { useChat } from './context/ChatContext';
+
+const ScannerView = lazy(() => import('./components/ScannerView'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
 
 function getInitialState() {
   const code = parseScanCodeFromPath(window.location.pathname);
@@ -183,17 +185,24 @@ function AppNav() {
             : 'px-2 sm:px-4 items-center'
         }`}
       >
-        <div className={view === 'scanner' ? 'w-full max-w-6xl mx-auto flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'scanner'}>
-          <ScannerView scanCode={scanCode} />
-        </div>
-        <div className={view === 'dashboard' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'dashboard'}>
-          <Dashboard
-            isActive={view === 'dashboard'}
-            openChatSessionId={dashboardChatId}
-            initialTab={dashboardTab}
-            onTabChange={setDashboardTab}
-          />
-        </div>
+        {view === 'scanner' ? (
+          <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
+            <Suspense fallback={<ViewLoader />}>
+              <ScannerView scanCode={scanCode} />
+            </Suspense>
+          </div>
+        ) : (
+          <div className="w-full flex flex-col items-center">
+            <Suspense fallback={<ViewLoader />}>
+              <Dashboard
+                isActive={view === 'dashboard'}
+                openChatSessionId={dashboardChatId}
+                initialTab={dashboardTab}
+                onTabChange={setDashboardTab}
+              />
+            </Suspense>
+          </div>
+        )}
       </main>
       <IncomingCallModal />
       <IncomingChatModal />

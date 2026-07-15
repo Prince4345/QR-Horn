@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import type { Html5Qrcode } from 'html5-qrcode';
 import { Loader2, X, Zap } from 'lucide-react';
 import { parseScanCodeFromQrText } from '../lib/scanUrl';
 import { APP_NAME } from '../lib/brand';
@@ -93,12 +93,8 @@ export default function QrCameraScanner({
   }, []);
 
   useEffect(() => {
-    const scanner = new Html5Qrcode(elementId, {
-      useBarCodeDetectorIfSupported: true,
-      verbose: false,
-    });
-    scannerRef.current = scanner;
     let cancelled = false;
+    let scanner: Html5Qrcode | null = null;
     let refocusInterval: ReturnType<typeof setInterval> | undefined;
 
     const scanConfig = {
@@ -127,16 +123,25 @@ export default function QrCameraScanner({
     };
 
     const startWithConstraints = async (constraints: MediaTrackConstraints) => {
+      if (!scanner) return;
       await scanner.start(constraints, scanConfig, onDecoded, () => {});
       await applyAutofocus(scanner);
       refocusInterval = window.setInterval(() => {
-        if (!scanner.isScanning || handledRef.current) return;
+        if (!scanner?.isScanning || handledRef.current) return;
         void applyAutofocus(scanner);
       }, 3000);
     };
 
     const start = async () => {
       try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (cancelled) return;
+        scanner = new Html5Qrcode(elementId, {
+          useBarCodeDetectorIfSupported: true,
+          verbose: false,
+        });
+        scannerRef.current = scanner;
+
         try {
           await startWithConstraints(buildCameraConstraints());
         } catch {
@@ -172,8 +177,8 @@ export default function QrCameraScanner({
       if (refocusInterval) clearInterval(refocusInterval);
       void (async () => {
         try {
-          if (scanner.isScanning) await scanner.stop();
-          scanner.clear();
+          if (scanner?.isScanning) await scanner.stop();
+          scanner?.clear();
         } catch {
           // ignore cleanup errors
         }

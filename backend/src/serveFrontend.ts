@@ -13,13 +13,27 @@ export function attachFrontend(app: Express) {
     return;
   }
 
-  app.use(express.static(frontendDist, { index: false }));
+  app.use(
+    express.static(frontendDist, {
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else if (/\.(png|jpe?g|svg|ico|webp|woff2?)$/i.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      },
+    })
+  );
 
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
       next();
       return;
     }
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
 

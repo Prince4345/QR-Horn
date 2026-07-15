@@ -18,6 +18,7 @@ import {
   subscribeIncomingChat,
 } from '../lib/chatClient';
 import { registerOwnerSocket } from '../lib/voiceCall';
+import { useVisibleInterval } from '../lib/useVisibleInterval';
 import { useAuth } from './AuthContext';
 import { api } from '../lib/api';
 import { playMessageSound } from '../lib/messageSound';
@@ -167,27 +168,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     registerOwnerSocket(owner.id);
   }, [owner?.id]);
 
-  useEffect(() => {
-    if (!owner?.id) return;
-    void refreshSessions();
-    const interval = setInterval(() => void refreshSessions(), POLL_MS);
-    return () => clearInterval(interval);
-  }, [owner?.id, refreshSessions]);
+  useVisibleInterval(() => void refreshSessions(), POLL_MS, !!owner?.id);
 
   // Poll open conversation as socket fallback
-  useEffect(() => {
-    if (!owner?.id || !openSessionId) return;
-    const tick = async () => {
-      try {
-        const session = await api.getChatSession(openSessionId);
-        setActiveSession(session);
-      } catch {
-        // ignore
-      }
-    };
-    const interval = setInterval(() => void tick(), POLL_MS);
-    return () => clearInterval(interval);
-  }, [owner?.id, openSessionId]);
+  useVisibleInterval(
+    () => {
+      if (!openSessionId) return;
+      void api
+        .getChatSession(openSessionId)
+        .then((session) => setActiveSession(session))
+        .catch(() => {});
+    },
+    POLL_MS,
+    !!owner?.id && !!openSessionId
+  );
 
   useEffect(() => {
     if (!owner?.id) return;

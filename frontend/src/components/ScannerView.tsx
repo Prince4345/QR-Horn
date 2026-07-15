@@ -400,6 +400,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       handleIncomingSession(session);
     });
     const poll = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       void api
         .getScannerChat(chatSessionId, scannerToken)
         .then((session) => handleIncomingSession(session))
