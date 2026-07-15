@@ -15,6 +15,7 @@ import {
   LogOut,
   Bell,
   Pencil,
+  ChevronDown,
 } from 'lucide-react';
 import { api, type Vehicle, type Activity } from '../lib/api';
 import { playPingSound } from '../lib/pingSound';
@@ -38,14 +39,109 @@ import { useChat } from '../context/ChatContext';
 import ChatPanel from './ChatPanel';
 import OwnerMessagesView from './OwnerMessagesView';
 
-function formatActivityTime(iso: string) {
+function getActivityDateGroup(iso: string) {
   const date = new Date(iso);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
-  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (diffDays === 0) return `Today, ${time}`;
-  if (diffDays === 1) return `Yesterday, ${time}`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + `, ${time}`;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.floor((startOfToday.getTime() - startOfDate.getTime()) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatActivityTimeOnly(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function groupActivitiesByDate(activities: Activity[]) {
+  const groups: { label: string; items: Activity[] }[] = [];
+  const map = new Map<string, Activity[]>();
+  for (const act of activities) {
+    const label = getActivityDateGroup(act.time);
+    if (!map.has(label)) {
+      map.set(label, []);
+      groups.push({ label, items: map.get(label)! });
+    }
+    map.get(label)!.push(act);
+  }
+  return groups;
+}
+
+function ActivityRow({ act }: { act: Activity }) {
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors">
+      <div className="p-1.5 rounded-full bg-white/5 shrink-0">
+        {act.type === 'call' ? (
+          <Phone className="w-3.5 h-3.5 text-emerald-400" />
+        ) : act.type === 'chat' ? (
+          <MessageSquare className="w-3.5 h-3.5 text-violet-400" />
+        ) : (
+          <BellRing className="w-3.5 h-3.5 text-blue-400" />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-slate-200 truncate">{act.reason}</p>
+      </div>
+      <span className="text-[11px] text-slate-500 shrink-0 tabular-nums">{formatActivityTimeOnly(act.time)}</span>
+    </div>
+  );
+}
+
+function ActivityLogGroups({
+  activities,
+  expandedGroups,
+  onToggleGroup,
+}: {
+  activities: Activity[];
+  expandedGroups: Set<string>;
+  onToggleGroup: (label: string) => void;
+}) {
+  const groups = groupActivitiesByDate(activities);
+
+  return (
+    <div className="space-y-2 max-h-[min(420px,50dvh)] overflow-y-auto scrollbar-none pr-0.5">
+      {groups.map(({ label, items }) => {
+        const expanded = expandedGroups.has(label);
+        return (
+          <div key={label} className="rounded-xl border border-white/10 overflow-hidden bg-white/[0.02]">
+            <button
+              type="button"
+              onClick={() => onToggleGroup(label)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 transition-colors text-left"
+            >
+              <span className="font-medium text-sm text-slate-200">{label}</span>
+              <span className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
+                <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                  {items.length}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+                />
+              </span>
+            </button>
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="py-1 border-t border-white/5 divide-y divide-white/5">
+                    {items.map((act) => (
+                      <ActivityRow key={act.id} act={act} />
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function isMobileDevice() {
@@ -189,10 +285,30 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [expandedActivityGroups, setExpandedActivityGroups] = useState<Set<string>>(new Set());
   const isMobile = isMobileDevice();
   const stickerRef = useRef<HTMLDivElement>(null);
   const hasLoadedVehicles = useRef(false);
   const lastActivityCount = useRef(0);
+  const lastActivityVehicleId = useRef<string | null>(null);
+
+  const toggleActivityGroup = (label: string) => {
+    setExpandedActivityGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!selectedVehicle || activities.length === 0) return;
+    if (lastActivityVehicleId.current !== selectedVehicle.id) {
+      lastActivityVehicleId.current = selectedVehicle.id;
+      const first = groupActivitiesByDate(activities)[0]?.label;
+      setExpandedActivityGroups(first ? new Set([first]) : new Set());
+    }
+  }, [selectedVehicle?.id, activities]);
 
   const loadVehicles = async (silent = false) => {
     if (!silent && vehicles.length === 0) setLoading(true);
@@ -756,27 +872,15 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               </div>
 
               <h3 className="text-lg font-medium text-slate-200 mb-4">Recent Activity</h3>
-              <div className="flex-grow space-y-3">
+              <div className="flex-grow">
                 {activities.length === 0 ? (
                   <p className="text-slate-500 text-sm">No activity yet.</p>
                 ) : (
-                  activities.map((act) => (
-                    <div key={act.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-transparent hover:border-white/5">
-                      <div className="p-2 rounded-full bg-white/5">
-                        {act.type === 'call' ? (
-                          <Phone className="w-4 h-4 text-emerald-400" />
-                        ) : act.type === 'chat' ? (
-                          <MessageSquare className="w-4 h-4 text-violet-400" />
-                        ) : (
-                          <BellRing className="w-4 h-4 text-blue-400" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-200">{act.reason}</p>
-                        <p className="text-xs text-slate-500">{formatActivityTime(act.time)}</p>
-                      </div>
-                    </div>
-                  ))
+                  <ActivityLogGroups
+                    activities={activities}
+                    expandedGroups={expandedActivityGroups}
+                    onToggleGroup={toggleActivityGroup}
+                  />
                 )}
               </div>
               </>

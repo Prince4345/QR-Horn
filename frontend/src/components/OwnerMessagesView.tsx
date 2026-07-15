@@ -99,7 +99,7 @@ export default function OwnerMessagesView({
           <h1 className="text-lg font-semibold">Messages</h1>
           <p className="text-xs text-slate-500">Tap a conversation to reply</p>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto scrollbar-none min-h-0">
           <ConversationList
             sessions={sessions}
             openSessionId={openSessionId}
