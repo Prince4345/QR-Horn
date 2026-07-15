@@ -21,6 +21,16 @@ import { api, type ContactReason, type ContactMethod, type ScanData } from '../l
 import { VoiceCallSession, type CallPhase, advanceCallPhase, preflightMicPermission } from '../lib/voiceCall';
 import QrCameraScanner from './QrCameraScanner';
 import CallTimer from './CallTimer';
+import ChatPanel from './ChatPanel';
+import {
+  type ChatSession,
+  buildChatUrl,
+  joinChatAsScanner,
+  loadScannerToken,
+  saveScannerToken,
+  subscribeChatMessages,
+  subscribeChatSessionUpdates,
+} from '../lib/chatClient';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -48,6 +58,12 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   const [showCamera, setShowCamera] = useState(false);
   const [callPhase, setCallPhase] = useState<CallPhase>('idle');
   const [muted, setMuted] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSession, setChatSession] = useState<ChatSession | null>(null);
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [scannerToken, setScannerToken] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [activeCallRoomId, setActiveCallRoomId] = useState<string | null>(null);
   const callSessionRef = useRef<VoiceCallSession | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -70,6 +86,62 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     callSessionRef.current?.end();
     callSessionRef.current = null;
     setCallPhase('idle');
+    setChatOpen(false);
+    setActiveCallRoomId(null);
+  };
+
+  const attachChatSession = (sessionId: string, token: string, session: ChatSession) => {
+    saveScannerToken(sessionId, token);
+    setChatSessionId(sessionId);
+    setScannerToken(token);
+    setChatSession(session);
+    window.history.replaceState(null, '', buildChatUrl(sessionId));
+    void joinChatAsScanner(sessionId, token);
+  };
+
+  const restoreChatFromUrl = async (vehicleId: string) => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('chat');
+    if (!sessionId) return;
+    const token = loadScannerToken(sessionId);
+    if (!token) return;
+    setChatLoading(true);
+    try {
+      const session = await api.getScannerChat(sessionId, token);
+      if (session.vehicleId !== vehicleId) return;
+      attachChatSession(sessionId, token, session);
+      setChatOpen(true);
+    } catch {
+      // expired or invalid
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const startChat = async (opts?: { reason?: ContactReason; callRoomId?: string }) => {
+    if (!scanData) return;
+    setChatLoading(true);
+    setError(null);
+    try {
+      const existingToken = chatSessionId ? loadScannerToken(chatSessionId) : null;
+      const result = await api.startChat(scanData.vehicleId, {
+        reason: opts?.reason ?? selectedReason ?? undefined,
+        callRoomId: opts?.callRoomId ?? activeCallRoomId ?? undefined,
+        scannerToken: existingToken ?? scannerToken ?? undefined,
+      });
+      attachChatSession(result.sessionId, result.scannerToken, result.session);
+      setChatOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start chat');
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const sendScannerMessage = async (body: string, isQuickReply?: boolean) => {
+    if (!chatSessionId || !scannerToken) throw new Error('Chat not ready');
+    const result = await api.sendScannerChatMessage(chatSessionId, scannerToken, body, isQuickReply);
+    setChatSession(result.session);
   };
 
   const loadByQr = async (code: string) => {
@@ -131,6 +203,26 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     }
   }, [scanCode]);
 
+  useEffect(() => {
+    if (scanData?.vehicleId) {
+      void restoreChatFromUrl(scanData.vehicleId);
+    }
+  }, [scanData?.vehicleId]);
+
+  useEffect(() => {
+    if (!chatSessionId || !scannerToken) return;
+    const unsubMsg = subscribeChatMessages(({ sessionId, session }) => {
+      if (sessionId === chatSessionId) setChatSession(session);
+    });
+    const unsubSession = subscribeChatSessionUpdates((session) => {
+      if (session.id === chatSessionId) setChatSession(session);
+    });
+    return () => {
+      unsubMsg();
+      unsubSession();
+    };
+  }, [chatSessionId, scannerToken]);
+
   const handleNotify = async () => {
     if (!selectedReason || !contactMethod || !contactId) return;
     setStatus('notifying');
@@ -161,6 +253,11 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     try {
       await preflightMicPermission();
       const result = await api.initiateCall(contactMethod, contactId);
+      setActiveCallRoomId(result.roomId);
+      if (result.chatSessionId && result.scannerToken) {
+        const chat = await api.getScannerChat(result.chatSessionId, result.scannerToken);
+        attachChatSession(result.chatSessionId, result.scannerToken, chat);
+      }
       const session = await VoiceCallSession.beginOutgoing(result.roomId, {
         onPhase: (phase) => {
           setCallPhase((current) => advanceCallPhase(current, phase));
@@ -432,6 +529,25 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                     </div>
                     <span className="text-[10px] font-normal opacity-70">In-app call like Instagram — no phone number needed</span>
                   </button>
+                  <button
+                    onClick={() => void startChat()}
+                    disabled={chatLoading}
+                    className="w-full py-4 bg-violet-600/80 hover:bg-violet-600 disabled:opacity-50 text-white rounded-3xl font-bold flex items-center justify-center gap-2"
+                  >
+                    {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
+                    Chat Owner
+                  </button>
+                  {chatOpen && chatSession && (
+                    <div className="mt-2 p-4 rounded-2xl bg-white/5 border border-white/10 max-h-[360px] overflow-hidden flex flex-col">
+                      <p className="text-xs text-white/50 mb-2 uppercase tracking-wider">Session chat</p>
+                      <ChatPanel
+                        session={chatSession}
+                        role="scanner"
+                        onSend={sendScannerMessage}
+                        compact
+                      />
+                    </div>
+                  )}
                   {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                   <div className="mt-6 flex justify-center items-center gap-2 text-white/30 text-[10px] tracking-widest uppercase">
                     <div className="w-8 h-[1px] bg-white/10" />
@@ -493,6 +609,21 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                 </div>
 
                 <div className="w-full pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-3">
+                  {chatSession && (
+                    <button
+                      type="button"
+                      onClick={() => setChatOpen((v) => !v)}
+                      className="w-full min-h-[44px] py-3 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-100 font-medium flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      {chatOpen ? 'Hide chat' : 'Open chat with owner'}
+                    </button>
+                  )}
+                  {chatOpen && chatSession && (
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 max-h-[280px] overflow-hidden">
+                      <ChatPanel session={chatSession} role="scanner" onSend={sendScannerMessage} compact />
+                    </div>
+                  )}
                   {(callPhase === 'active' || callPhase === 'connecting') && (
                     <button
                       onClick={toggleMute}

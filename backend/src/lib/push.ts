@@ -96,7 +96,7 @@ async function sendDataToOwnerDevices(
                 notification: {
                   title: webNotification.title,
                   body: webNotification.body,
-                  tag: data.kind === 'call' ? 'qrhorn-call' : 'qrhorn-alert',
+                  tag: data.kind === 'call' ? 'qrhorn-call' : data.kind === 'chat' ? 'qrhorn-chat' : 'qrhorn-alert',
                   requireInteraction: data.kind === 'call',
                 },
                 ...(webNotification.link ? { fcmOptions: { link: webNotification.link } } : {}),
@@ -164,6 +164,40 @@ export async function sendPushToOwner(
     data,
     isCall ? 60 : 3600,
     isCall ? { title, body, link: appBase ? `${appBase}${relativeUrl}` : undefined } : undefined
+  );
+
+  return result.sent > 0;
+}
+
+/** Push when a scanner sends a chat message (no SMS). */
+export async function sendChatMessagePush(
+  ownerId: string,
+  payload: {
+    sessionId: string;
+    vehicleName: string;
+    vehicleNumber: string;
+    preview: string;
+  }
+): Promise<boolean> {
+  const title = `💬 ${payload.vehicleName}`;
+  const body =
+    payload.preview.length > 80 ? `${payload.preview.slice(0, 77)}…` : payload.preview;
+  const appBase = process.env.KEEP_ALIVE_URL?.trim()?.replace(/\/$/, '') ?? '';
+  const relativeUrl = `/?view=dashboard&chat=${encodeURIComponent(payload.sessionId)}`;
+
+  const data: Record<string, string> = {
+    title,
+    body,
+    kind: 'chat',
+    url: relativeUrl,
+    sessionId: payload.sessionId,
+  };
+
+  const result = await sendDataToOwnerDevices(
+    ownerId,
+    data,
+    3600,
+    { title, body, link: appBase ? `${appBase}${relativeUrl}` : undefined }
   );
 
   return result.sent > 0;

@@ -7,32 +7,40 @@ import { useState, useEffect, useCallback } from 'react';
 import ScannerView from './components/ScannerView';
 import Dashboard from './components/Dashboard';
 import IncomingCallModal from './components/IncomingCallModal';
+import IncomingChatModal from './components/IncomingChatModal';
 import { LayoutDashboard, QrCode } from 'lucide-react';
 import { parseScanCodeFromPath } from './lib/scanUrl';
 
 function getInitialState() {
   const code = parseScanCodeFromPath(window.location.pathname);
+  const params = new URLSearchParams(window.location.search);
   // Push notifications deep-link owners straight to the dashboard
   const wantsDashboard =
-    !code && new URLSearchParams(window.location.search).get('view') === 'dashboard';
+    !code && params.get('view') === 'dashboard';
   return {
     scanCode: code ?? undefined,
     view: (wantsDashboard ? 'dashboard' : 'scanner') as 'scanner' | 'dashboard',
+    chatSessionId: params.get('chat') ?? undefined,
   };
 }
 
 export default function App() {
   const [view, setView] = useState<'scanner' | 'dashboard'>(getInitialState().view);
   const [scanCode, setScanCode] = useState<string | undefined>(getInitialState().scanCode);
+  const [dashboardChatId, setDashboardChatId] = useState<string | undefined>(getInitialState().chatSessionId);
 
   const syncFromUrl = useCallback(() => {
     const code = parseScanCodeFromPath(window.location.pathname);
+    const params = new URLSearchParams(window.location.search);
     if (code) {
       setScanCode(code);
       setView('scanner');
     } else {
       setScanCode(undefined);
     }
+    const chat = params.get('chat');
+    if (chat) setDashboardChatId(chat);
+    if (params.get('view') === 'dashboard') setView('dashboard');
   }, []);
 
   useEffect(() => {
@@ -53,6 +61,9 @@ export default function App() {
           window.history.replaceState(null, '', url.startsWith('http') ? new URL(url).pathname + new URL(url).search : url);
         }
         window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
+      }
+      if (event.data?.type === 'qrhorn:open-dashboard' && event.data?.url?.includes('chat=')) {
+        window.dispatchEvent(new CustomEvent('qrhorn:incoming-chat'));
       }
     };
     navigator.serviceWorker.addEventListener('message', onSwMessage);
@@ -109,10 +120,11 @@ export default function App() {
           <ScannerView scanCode={scanCode} />
         </div>
         <div className={view === 'dashboard' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'dashboard'}>
-          <Dashboard isActive={view === 'dashboard'} />
+          <Dashboard isActive={view === 'dashboard'} openChatSessionId={dashboardChatId} />
         </div>
       </main>
       <IncomingCallModal />
+      <IncomingChatModal />
     </div>
   );
 }

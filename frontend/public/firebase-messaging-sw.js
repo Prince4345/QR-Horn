@@ -20,13 +20,18 @@ const messaging = firebase.messaging();
 
 function showCallOrAlert(data) {
   const isCall = data.kind === 'call';
+  const isChat = data.kind === 'chat';
   return self.registration.showNotification(data.title ?? 'QRHorn', {
     body: data.body ?? 'New vehicle contact',
-    tag: isCall ? 'qrhorn-call' : 'qrhorn-alert',
-    renotify: isCall,
+    tag: isCall ? 'qrhorn-call' : isChat ? 'qrhorn-chat' : 'qrhorn-alert',
+    renotify: isCall || isChat,
     requireInteraction: isCall,
-    vibrate: isCall ? [400, 200, 400, 200, 400] : [200],
-    data: { url: data.url ?? '/?view=dashboard', roomId: data.roomId ?? null },
+    vibrate: isCall ? [400, 200, 400, 200, 400] : isChat ? [200, 100, 200] : [200],
+    data: {
+      url: data.url ?? '/?view=dashboard',
+      roomId: data.roomId ?? null,
+      sessionId: data.sessionId ?? null,
+    },
     actions: isCall
       ? [
           { action: 'answer', title: '✅ Answer' },

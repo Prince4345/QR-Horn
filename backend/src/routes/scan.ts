@@ -6,6 +6,7 @@ import { sendOwnerAlert } from '../lib/alerts.js';
 import { createVoiceRoom, setRoomCallId } from '../lib/voiceRooms.js';
 import { emitIncomingCall } from '../socket.js';
 import { checkScanActionLimit } from '../lib/rateLimit.js';
+import { ensureChatSession } from '../lib/chatSessions.js';
 import { nanoid } from 'nanoid';
 
 const router = Router();
@@ -220,9 +221,17 @@ router.post('/by-number/:number/call', async (req, res) => {
       vehicleNumber: vehicle.number,
     });
 
+    const chat = await ensureChatSession({
+      vehicleId: vehicle.id,
+      ownerId: vehicle.ownerId,
+      callRoomId: roomId,
+    });
+
     res.json({
       success: true,
       roomId,
+      chatSessionId: chat.sessionId,
+      scannerToken: chat.scannerToken,
       callInitiated: true,
       alertDelivered: alert.alertDelivered,
       pushDelivered: alert.pushDelivered,
@@ -329,9 +338,17 @@ router.post('/:code/call', async (req, res) => {
       vehicleNumber: vehicle.number,
     });
 
+    const chat = await ensureChatSession({
+      vehicleId: vehicle.id,
+      ownerId: vehicle.ownerId,
+      callRoomId: roomId,
+    });
+
     res.json({
       success: true,
       roomId,
+      chatSessionId: chat.sessionId,
+      scannerToken: chat.scannerToken,
       callInitiated: true,
       alertDelivered: alert.alertDelivered,
       pushDelivered: alert.pushDelivered,

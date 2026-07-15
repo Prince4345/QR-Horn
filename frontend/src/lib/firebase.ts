@@ -70,6 +70,7 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
         const title = data.title ?? payload.notification?.title ?? 'QRHorn';
         const body = data.body ?? payload.notification?.body ?? 'New vehicle contact';
         const isCall = data.kind === 'call';
+        const isChat = data.kind === 'chat';
         // "Foreground" per FCM just means the tab's JS is alive — that still
         // happens while the screen is off/another app is in front. In that
         // case the in-app ring (CallContext) is invisible, so surface a real
@@ -105,6 +106,12 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
             window.history.replaceState(null, '', data.url);
           }
           window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
+        }
+        if (isChat) {
+          if (data.url) {
+            window.history.replaceState(null, '', data.url);
+          }
+          window.dispatchEvent(new CustomEvent('qrhorn:incoming-chat'));
         }
         window.dispatchEvent(new CustomEvent('qrhorn:ping'));
       });

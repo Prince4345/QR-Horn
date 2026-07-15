@@ -18,6 +18,8 @@ import {
   replaySignalsToSocket,
   type SignalRole,
 } from './lib/callSignaling.js';
+import type { ChatMessageDto, ChatSessionDto } from './lib/chatSessions.js';
+import { prisma } from './lib/prisma.js';
 
 let io: Server | null = null;
 
@@ -164,6 +166,53 @@ export function initSocketServer(httpServer: HttpServer) {
       bufferIce(roomId, role === 'owner' ? 'owner' : 'caller', candidate);
       io!.to(`voice:${roomId}`).emit('webrtc:ice', { roomId, candidate });
     });
+
+    socket.on(
+      'chat:join',
+      async (
+        payload: { sessionId?: string; role?: string; token?: string; ownerId?: string },
+        ack?: (r: { ok: boolean; reason?: string }) => void
+      ) => {
+        const sessionId = payload?.sessionId;
+        if (!sessionId) {
+          ack?.({ ok: false, reason: 'not_found' });
+          return;
+        }
+
+        if (payload.role === 'owner') {
+          const ownerId = payload.ownerId;
+          if (!ownerId) {
+            ack?.({ ok: false, reason: 'unauthorized' });
+            return;
+          }
+          const session = await prisma.chatSession.findFirst({
+            where: { id: sessionId, ownerId },
+          });
+          if (!session) {
+            ack?.({ ok: false, reason: 'not_found' });
+            return;
+          }
+          socket.join(`chat:${sessionId}`);
+          ack?.({ ok: true });
+          return;
+        }
+
+        const token = payload.token;
+        if (!token) {
+          ack?.({ ok: false, reason: 'unauthorized' });
+          return;
+        }
+        const session = await prisma.chatSession.findFirst({
+          where: { id: sessionId, scannerToken: token },
+        });
+        if (!session) {
+          ack?.({ ok: false, reason: 'not_found' });
+          return;
+        }
+        socket.join(`chat:${sessionId}`);
+        ack?.({ ok: true });
+      }
+    );
   });
 
   return io;
@@ -210,4 +259,28 @@ export function emitIncomingCall(
 ) {
   if (!io) return;
   io.to(`owner:${ownerId}`).emit('call:incoming', payload);
+}
+
+export function emitChatMessage(sessionId: string, message: ChatMessageDto, session: ChatSessionDto) {
+  if (!io) return;
+  io.to(`chat:${sessionId}`).emit('chat:message', { sessionId, message, session });
+}
+
+export function emitChatSessionUpdate(ownerId: string, session: ChatSessionDto) {
+  if (!io) return;
+  io.to(`owner:${ownerId}`).emit('chat:session', { session });
+  io.to(`chat:${session.id}`).emit('chat:session', { session });
+}
+
+export function emitIncomingChat(
+  ownerId: string,
+  payload: {
+    sessionId: string;
+    vehicleName: string;
+    vehicleNumber: string;
+    preview: string;
+  }
+) {
+  if (!io) return;
+  io.to(`owner:${ownerId}`).emit('chat:incoming', payload);
 }

@@ -31,7 +31,7 @@ Set these on the **web service** (not in committed `.env` files).
 |----------|-------------------|
 | `NODE_ENV` | `production` |
 | `DATABASE_URL` | Supabase **session pooler** (port 5432) |
-| `DIRECT_URL` | Supabase **direct** connection (for one-time `db push`) |
+| `DIRECT_URL` | **Same session pooler URL** as `DATABASE_URL` (for `prisma db push`). Avoid `db.*.supabase.co` locally — it often fails on Windows. |
 | `SUPABASE_URL` | `https://YOUR_REF.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (secret) |
 | `FIREBASE_PROJECT_ID` | From Firebase console |
@@ -61,92 +61,68 @@ Leave `VITE_API_URL` **unset** in production so the app uses the same origin as 
 | Variable | Purpose |
 |----------|---------|
 | `GEMINI_API_KEY` | AI sticker backgrounds |
-| `FAST2SMS_API_KEY` | SMS via Fast2SMS — see section below |
-| `FAST2SMS_ROUTE` | `dlt` (cheap, ~₹0.25) or `q` (Quick, ~₹5 — avoid) |
-| `FAST2SMS_SENDER_ID` | DLT sender ID (required for `dlt` route) |
-| `FAST2SMS_MESSAGE_ID` | DLT template Message ID from Fast2SMS |
+| `FAST2SMS_API_KEY` | SMS via Fast2SMS (India, cheap) — see section below |
+| `FAST2SMS_ROUTE` | Fast2SMS route (default `q` = Quick SMS) |
 | `TWILIO_*` | SMS via Twilio (global, optional alternative) |
 
-### SMS with Fast2SMS (India)
+### SMS with Fast2SMS (India — recommended)
 
 QRHorn uses SMS only as a **fallback** when push notifications fail. Voice calls stay free (WebRTC).
 
-#### Cheapest option for individuals: skip SMS
+#### Step 1 — Create account
 
-Remove `FAST2SMS_API_KEY` from Render. Owners get **Firebase push** + **in-app voice calls** for **₹0**.
+1. Go to [fast2sms.com](https://www.fast2sms.com) → **Sign up**
+2. Verify your email and log in
 
-Only add SMS if you need texts when the app is fully closed and push fails.
+#### Step 2 — Add wallet balance
 
-#### Fast2SMS pricing (important)
+1. Dashboard → **Add Funds** (minimum is usually small, e.g. ₹100)
+2. Quick SMS (`route: q`) is pay-as-you-go (~₹0.15–0.25 per SMS depending on plan)
 
-| Route | Cost | Setup |
-|-------|------|--------|
-| **`q` Quick SMS** | **~₹5 per SMS** | API key only — expensive |
-| **`dlt` DLT SMS** | **~₹0.25 per SMS** (₹100 wallet) | DLT template + sender ID |
+#### Step 3 — Get API key
 
-**Do not use Quick SMS (`q`) for QRHorn** — use **DLT route** or skip SMS entirely.
+1. Dashboard → **Dev API**
+2. Copy your **Authorization Key** (enabled by default)
+3. Keep it secret — treat it like a password
 
-#### Option A — DLT SMS (~25 paise each) — recommended if you want SMS
+#### Step 4 — (Optional) Lock API to Render IP
 
-**Step 1 — Fast2SMS account**
+1. Dev API → **Security** tab → enable IP whitelist
+2. Add your Render service outbound IP (or skip for testing)
+3. If enabled, only requests from that IP work
 
-1. [fast2sms.com](https://www.fast2sms.com) → sign up
-2. **Add Funds** → ₹100 minimum (gives ₹0.25/SMS rate)
-
-**Step 2 — DLT registration (one-time, India law)**
-
-1. Fast2SMS → **DLT Manager** (they offer free DLT help)
-2. Register your **Entity** on TRAI DLT portal (or via Fast2SMS guide)
-3. Add a **Sender ID** (6 chars, e.g. `QRHORN`)
-4. Add a **Content Template** — use this exact text (3 variables):
-
-   ```
-   QRHorn: {#var#} ({#var#}) - {#var#}.
-   ```
-
-   Category: **Service Implicit** (vehicle/contact alert to owner).
-
-5. Wait for template approval (usually 1–3 days)
-6. In Fast2SMS **DLT Manager**, link your approved sender + template
-7. Open **Dev API** → route **DLT SMS** → select template → note the **Message ID** (6 digits, e.g. `198273`)
-
-**Step 3 — Render env vars**
-
-| Variable | Example |
-|----------|---------|
-| `FAST2SMS_API_KEY` | Authorization Key from Dev API |
-| `FAST2SMS_ROUTE` | `dlt` |
-| `FAST2SMS_SENDER_ID` | `QRHORN` (your approved sender) |
-| `FAST2SMS_MESSAGE_ID` | `198273` (your template Message ID) |
-
-Redeploy after saving.
-
-**Step 4 — Test**
-
-1. Owner Profile → Indian mobile `9876543210`
-2. Scan QR → Send Notification
-3. SMS should arrive as: `QRHorn: HONDA (HR60N7731) - Please move your vehicle.`
-
-#### Option B — Quick SMS (not recommended)
-
-Only for quick testing. **~₹5 per SMS.**
+#### Step 5 — Set env vars on Render
 
 | Variable | Value |
 |----------|--------|
-| `FAST2SMS_ROUTE` | `q` |
-| `FAST2SMS_API_KEY` | your key |
+| `FAST2SMS_API_KEY` | Your Authorization Key from Dev API |
+| `FAST2SMS_ROUTE` | `q` (Quick SMS — default, no DLT template needed for testing) |
 
-Leave `FAST2SMS_SENDER_ID` and `FAST2SMS_MESSAGE_ID` empty.
+Remove or leave empty any `TWILIO_*` vars if you are not using Twilio. **Fast2SMS is used when `FAST2SMS_API_KEY` is set.**
+
+Redeploy after saving env vars.
+
+#### Step 6 — Owner phone number format
+
+Owners must save an **Indian 10-digit mobile** in Profile (e.g. `9876543210` or `+91 9876543210`).
+
+#### Step 7 — Test
+
+1. Open your live site → log in as owner → Profile → add mobile number
+2. From another device, scan the QR → **Send Notification**
+3. Owner should receive an SMS like: `QRHorn: HONDA (HR60N7731) — Please move your vehicle`
+4. Check Render **Logs** if SMS fails (`Fast2SMS failed:` lines)
 
 #### Troubleshooting
 
 | Error | Fix |
 |-------|-----|
-| `Invalid Authentication` | Wrong API key |
-| `Insufficient balance` | Top up wallet |
-| DLT template rejected | Match template text exactly; use Service Implicit |
-| SMS skipped in logs | Missing `SENDER_ID` / `MESSAGE_ID` when route is `dlt` |
-| Still charged ₹5 | You are on route `q` — switch to `dlt` |
+| `Invalid Authentication` | Wrong or disabled API key — regenerate in Dev API |
+| `Insufficient balance` | Top up wallet on Fast2SMS |
+| SMS skipped in logs | Owner has no phone or not a valid 10-digit Indian number |
+| IP blocked | Disable Security whitelist or add Render IP |
+
+**Note:** For high-volume or commercial use in India, DLT registration (sender ID + template) may be required. Quick route `q` is fine for personal / low-volume QRHorn use.
 
 ### Voice calls across networks (TURN)
 

@@ -860,6 +860,11 @@ export function registerOwnerSocket(ownerId: string) {
   }
 }
 
+/** Shared socket.io connection (voice + chat). */
+export function getSharedSocket() {
+  return getSocket();
+}
+
 export function subscribeIncomingCalls(cb: (call: IncomingCall) => void) {
   const socket = getSocket();
   const handler = (payload: IncomingCall) => cb(payload);

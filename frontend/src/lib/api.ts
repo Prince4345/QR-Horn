@@ -76,7 +76,7 @@ export interface Vehicle {
 
 export interface Activity {
   id: string;
-  type: 'notification' | 'call';
+  type: 'notification' | 'call' | 'chat';
   reason: string;
   time: string;
 }
@@ -220,6 +220,8 @@ export const api = {
     request<{
       success: boolean;
       roomId: string;
+      chatSessionId?: string;
+      scannerToken?: string;
       callInitiated: boolean;
       alertDelivered: boolean;
       message: string;
@@ -229,4 +231,42 @@ export const api = {
         : `/api/scan/by-number/${encodeURIComponent(id)}/call`,
       { method: 'POST', body: JSON.stringify({}) }
     ),
+
+  startChat: (vehicleId: string, data?: { reason?: ContactReason; callRoomId?: string; scannerToken?: string }) =>
+    request<{
+      sessionId: string;
+      scannerToken: string;
+      session: import('./chatClient').ChatSession;
+    }>(`/api/chat/start/${encodeURIComponent(vehicleId)}`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
+
+  getScannerChat: (sessionId: string, token: string) =>
+    request<import('./chatClient').ChatSession>(
+      `/api/chat/scanner/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`
+    ),
+
+  sendScannerChatMessage: (sessionId: string, token: string, body: string, isQuickReply?: boolean) =>
+    request<{ message: import('./chatClient').ChatMessage; session: import('./chatClient').ChatSession }>(
+      `/api/chat/scanner/${encodeURIComponent(sessionId)}/messages`,
+      { method: 'POST', body: JSON.stringify({ token, body, isQuickReply }) }
+    ),
+
+  getChatSessions: () => request<import('./chatClient').ChatSessionSummary[]>('/api/chat/sessions'),
+
+  getChatSession: (sessionId: string) =>
+    request<import('./chatClient').ChatSession>(`/api/chat/sessions/${encodeURIComponent(sessionId)}`),
+
+  sendOwnerChatMessage: (sessionId: string, body: string, isQuickReply?: boolean) =>
+    request<{ message: import('./chatClient').ChatMessage; session: import('./chatClient').ChatSession }>(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages`,
+      { method: 'POST', body: JSON.stringify({ body, isQuickReply }) }
+    ),
+
+  blockChatSession: (sessionId: string) =>
+    request<{ success: boolean }>(`/api/chat/sessions/${encodeURIComponent(sessionId)}/block`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };

@@ -6,9 +6,11 @@ import vehiclesRouter from './routes/vehicles.js';
 import scanRouter from './routes/scan.js';
 import authRouter from './routes/auth.js';
 import callsRouter from './routes/calls.js';
+import chatRouter from './routes/chat.js';
 import { attachFrontend } from './serveFrontend.js';
 import { prisma } from './lib/prisma.js';
 import { initSocketServer } from './socket.js';
+import { runChatCleanup } from './lib/chatSessions.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -48,6 +50,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/scan', scanRouter);
 app.use('/api/calls', callsRouter);
+app.use('/api/chat', chatRouter);
 
 if (isProd) {
   attachFrontend(app);
@@ -92,3 +95,8 @@ if (isProd && keepAliveUrl) {
   setInterval(ping, 10 * 60 * 1000);
   console.log(`Keep-alive ping enabled → ${keepAliveUrl}/api/health every 10 min`);
 }
+
+void runChatCleanup();
+setInterval(() => {
+  void runChatCleanup();
+}, 60 * 60 * 1000);

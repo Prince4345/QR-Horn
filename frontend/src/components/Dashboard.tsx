@@ -9,6 +9,7 @@ import {
   BellRing,
   Printer,
   Phone,
+  MessageSquare,
   Loader2,
   ExternalLink,
   LogOut,
@@ -33,6 +34,8 @@ import {
   parseStickerCustomization,
   type StickerCustomization,
 } from '../lib/stickerStyle';
+import { useChat } from '../context/ChatContext';
+import ChatPanel from './ChatPanel';
 
 function formatActivityTime(iso: string) {
   const date = new Date(iso);
@@ -92,9 +95,10 @@ function PhoneAlertsBanner({
 
 interface DashboardProps {
   isActive?: boolean;
+  openChatSessionId?: string;
 }
 
-export default function Dashboard({ isActive = true }: DashboardProps) {
+export default function Dashboard({ isActive = true, openChatSessionId }: DashboardProps) {
   const { session, setupComplete, profileLoading, owner, authError, refreshProfile, signOut, clearAuthError } = useAuth();
 
   if (profileLoading && !owner && !authError) {
@@ -137,17 +141,29 @@ export default function Dashboard({ isActive = true }: DashboardProps) {
     return <AuthPage />;
   }
 
-  return <DashboardContent isActive={isActive} />;
+  return <DashboardContent isActive={isActive} openChatSessionId={openChatSessionId} />;
 }
 
-function DashboardContent({ isActive = true }: DashboardProps) {
+function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps) {
   const { owner, signOut, enablePushNotifications, preparePushNotifications, pushEnabled } = useAuth();
+  const {
+    sessions,
+    activeSession,
+    loadingSession,
+    openChat,
+    openSessionId,
+    sendOwnerMessage,
+    blockSession,
+    closeOpenChat,
+    refreshSessions,
+  } = useChat();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSticker, setShowSticker] = useState(false);
+  const [detailTab, setDetailTab] = useState<'overview' | 'messages'>('overview');
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showEditVehicle, setShowEditVehicle] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -239,6 +255,19 @@ function DashboardContent({ isActive = true }: DashboardProps) {
       loadVehicles();
     }
   }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive || !openChatSessionId) return;
+    setDetailTab('messages');
+    setShowSticker(false);
+    void openChat(openChatSessionId);
+  }, [isActive, openChatSessionId, openChat]);
+
+  useEffect(() => {
+    if (isActive && detailTab === 'messages') {
+      void refreshSessions();
+    }
+  }, [isActive, detailTab, refreshSessions]);
 
   useEffect(() => {
     if (selectedVehicle) {
@@ -552,6 +581,67 @@ function DashboardContent({ isActive = true }: DashboardProps) {
         <AnimatePresence mode="wait">
           {!showSticker ? (
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={() => { setDetailTab('overview'); closeOpenChat(); }}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium ${detailTab === 'overview' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => setDetailTab('messages')}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'messages' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Messages
+                  {sessions.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-blue-600 text-[10px] font-bold">{sessions.length}</span>
+                  )}
+                </button>
+              </div>
+
+              {detailTab === 'messages' ? (
+                <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+                  <div className="lg:w-56 shrink-0 space-y-2 max-h-48 lg:max-h-none overflow-y-auto">
+                    {sessions.length === 0 ? (
+                      <p className="text-slate-500 text-sm">No active chats.</p>
+                    ) : (
+                      sessions.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => void openChat(s.id)}
+                          className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                            openSessionId === s.id ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
+                          }`}
+                        >
+                          <p className="text-sm font-medium truncate">{s.vehicleName}</p>
+                          <p className="text-[10px] font-mono text-slate-500 truncate">{s.vehicleNumber}</p>
+                          {s.lastMessage && (
+                            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{s.lastMessage.body}</p>
+                          )}
+                          {s.readOnly && (
+                            <span className="text-[10px] text-amber-400 uppercase mt-1 inline-block">Read-only</span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex-1 min-h-[360px] bg-white/5 rounded-2xl p-4 border border-white/5">
+                    {openSessionId ? (
+                      <ChatPanel
+                        session={activeSession}
+                        loading={loadingSession}
+                        role="owner"
+                        onSend={sendOwnerMessage}
+                        onBlock={() => blockSession(openSessionId)}
+                      />
+                    ) : (
+                      <p className="text-slate-500 text-sm text-center py-12">Select a conversation to reply.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+              <>
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">{selectedVehicle.name}</h1>
@@ -626,7 +716,13 @@ function DashboardContent({ isActive = true }: DashboardProps) {
                   activities.map((act) => (
                     <div key={act.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-transparent hover:border-white/5">
                       <div className="p-2 rounded-full bg-white/5">
-                        {act.type === 'call' ? <Phone className="w-4 h-4 text-emerald-400" /> : <BellRing className="w-4 h-4 text-blue-400" />}
+                        {act.type === 'call' ? (
+                          <Phone className="w-4 h-4 text-emerald-400" />
+                        ) : act.type === 'chat' ? (
+                          <MessageSquare className="w-4 h-4 text-violet-400" />
+                        ) : (
+                          <BellRing className="w-4 h-4 text-blue-400" />
+                        )}
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-200">{act.reason}</p>
@@ -636,6 +732,8 @@ function DashboardContent({ isActive = true }: DashboardProps) {
                   ))
                 )}
               </div>
+              </>
+              )}
             </motion.div>
           ) : (
             <motion.div key="sticker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
