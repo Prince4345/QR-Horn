@@ -10,11 +10,14 @@ import {
 import {
   type ChatSession,
   type IncomingChat,
+  chatSessionIdFromLocation,
   joinChatAsOwner,
+  navigateToOwnerChat,
   subscribeChatMessages,
   subscribeChatSessionUpdates,
   subscribeIncomingChat,
 } from '../lib/chatClient';
+import { registerOwnerSocket } from '../lib/voiceCall';
 import { useAuth } from './AuthContext';
 import { api } from '../lib/api';
 import { playMessageSound } from '../lib/messageSound';
@@ -25,7 +28,9 @@ interface ChatContextValue {
   sessions: Awaited<ReturnType<typeof api.getChatSessions>>;
   activeSession: ChatSession | null;
   loadingSession: boolean;
-  openChat: (sessionId: string) => Promise<void>;
+  unreadCount: number;
+  openChat: (sessionId: string, options?: { navigate?: boolean }) => Promise<void>;
+  replyToChat: (sessionId: string) => void;
   dismissIncoming: () => void;
   refreshSessions: () => Promise<void>;
   sendOwnerMessage: (body: string, isQuickReply?: boolean) => Promise<void>;
@@ -34,6 +39,19 @@ interface ChatContextValue {
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
+
+const DISMISS_TTL_MS = 120_000;
+const POLL_MS = 3000;
+
+function rememberDismissed(dismissed: Set<string>, sessionId: string) {
+  dismissed.add(sessionId);
+  setTimeout(() => dismissed.delete(sessionId), DISMISS_TTL_MS);
+}
+
+function shouldShowPopup(sessionId: string, dismissed: Set<string>, openId: string | null) {
+  if (openId === sessionId) return false;
+  return !dismissed.has(sessionId);
+}
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const { owner } = useAuth();
@@ -44,8 +62,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof api.getChatSessions>>>([]);
   const openSessionIdRef = useRef<string | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
+  const lastSeenRef = useRef<Map<string, string>>(new Map());
 
   openSessionIdRef.current = openSessionId;
+
+  const unreadCount = sessions.filter(
+    (s) =>
+      s.lastMessage?.senderRole === 'SCANNER' &&
+      s.id !== openSessionId &&
+      lastSeenRef.current.get(s.id) !== s.lastMessage.createdAt
+  ).length;
 
   const refreshSessions = useCallback(async () => {
     if (!owner?.id) {
@@ -60,6 +86,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [owner?.id]);
 
+  const showIncoming = useCallback((chat: IncomingChat) => {
+    if (!shouldShowPopup(chat.sessionId, dismissedRef.current, openSessionIdRef.current)) return;
+    setIncomingChat(chat);
+    playMessageSound();
+  }, []);
+
   const loadSession = useCallback(
     async (sessionId: string) => {
       if (!owner?.id) return;
@@ -67,6 +99,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       try {
         const session = await api.getChatSession(sessionId);
         setActiveSession(session);
+        const last = session.messages[session.messages.length - 1];
+        if (last) lastSeenRef.current.set(sessionId, last.createdAt);
         await joinChatAsOwner(sessionId, owner.id);
       } catch {
         setActiveSession(null);
@@ -78,14 +112,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   const openChat = useCallback(
-    async (sessionId: string) => {
+    async (sessionId: string, options?: { navigate?: boolean }) => {
+      if (options?.navigate !== false) {
+        navigateToOwnerChat(sessionId);
+        return;
+      }
       setOpenSessionId(sessionId);
       setIncomingChat(null);
-      dismissedRef.current.add(sessionId);
       await loadSession(sessionId);
     },
     [loadSession]
   );
+
+  const replyToChat = useCallback((sessionId: string) => {
+    setIncomingChat(null);
+    navigateToOwnerChat(sessionId);
+  }, []);
 
   const closeOpenChat = useCallback(() => {
     setOpenSessionId(null);
@@ -93,7 +135,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissIncoming = useCallback(() => {
-    if (incomingChat) dismissedRef.current.add(incomingChat.sessionId);
+    if (incomingChat) rememberDismissed(dismissedRef.current, incomingChat.sessionId);
     setIncomingChat(null);
   }, [incomingChat]);
 
@@ -102,6 +144,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       if (!openSessionId) return;
       const result = await api.sendOwnerChatMessage(openSessionId, body, isQuickReply);
       setActiveSession(result.session);
+      const last = result.session.messages[result.session.messages.length - 1];
+      if (last) lastSeenRef.current.set(openSessionId, last.createdAt);
     },
     [openSessionId]
   );
@@ -117,37 +161,62 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [openSessionId, closeOpenChat, refreshSessions]
   );
 
+  // Owner socket room (chat:incoming + chat:message on owner room)
+  useEffect(() => {
+    if (!owner?.id) return;
+    registerOwnerSocket(owner.id);
+  }, [owner?.id]);
+
   useEffect(() => {
     if (!owner?.id) return;
     void refreshSessions();
+    const interval = setInterval(() => void refreshSessions(), POLL_MS);
+    return () => clearInterval(interval);
   }, [owner?.id, refreshSessions]);
+
+  // Poll open conversation as socket fallback
+  useEffect(() => {
+    if (!owner?.id || !openSessionId) return;
+    const tick = async () => {
+      try {
+        const session = await api.getChatSession(openSessionId);
+        setActiveSession(session);
+      } catch {
+        // ignore
+      }
+    };
+    const interval = setInterval(() => void tick(), POLL_MS);
+    return () => clearInterval(interval);
+  }, [owner?.id, openSessionId]);
 
   useEffect(() => {
     if (!owner?.id) return;
 
-    const unsubIncoming = subscribeIncomingChat((chat) => {
-      if (dismissedRef.current.has(chat.sessionId)) return;
-      if (openSessionIdRef.current === chat.sessionId) return;
-      setIncomingChat(chat);
-      playMessageSound();
-    });
-
-    const unsubMsg = subscribeChatMessages(({ sessionId, message, session }) => {
+    const handleScannerMessage = (
+      sessionId: string,
+      message: { body: string; senderRole: string; createdAt: string },
+      session: ChatSession
+    ) => {
       if (openSessionIdRef.current === sessionId) {
         setActiveSession(session);
+        lastSeenRef.current.set(sessionId, message.createdAt);
+        return;
       }
-      if (message.senderRole === 'SCANNER' && openSessionIdRef.current !== sessionId) {
-        if (!dismissedRef.current.has(sessionId)) {
-          setIncomingChat({
-            sessionId,
-            vehicleName: session.vehicleName,
-            vehicleNumber: session.vehicleNumber,
-            preview: message.body,
-          });
-        }
-        playMessageSound();
+      if (message.senderRole === 'SCANNER') {
+        showIncoming({
+          sessionId,
+          vehicleName: session.vehicleName,
+          vehicleNumber: session.vehicleNumber,
+          preview: message.body,
+        });
       }
       void refreshSessions();
+    };
+
+    const unsubIncoming = subscribeIncomingChat((chat) => showIncoming(chat));
+
+    const unsubMsg = subscribeChatMessages(({ sessionId, message, session }) => {
+      handleScannerMessage(sessionId, message, session);
     });
 
     const unsubSession = subscribeChatSessionUpdates((session) => {
@@ -157,18 +226,44 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       void refreshSessions();
     });
 
-    const onPush = () => void refreshSessions();
-    window.addEventListener('qrhorn:incoming-chat', onPush);
-    window.addEventListener('qrhorn:ping', onPush);
+    const onIncomingChatPush = () => {
+      void refreshSessions();
+      const sessionId = chatSessionIdFromLocation();
+      if (!sessionId) return;
+      void api
+        .getChatSession(sessionId)
+        .then((session) => {
+          const last = session.messages[session.messages.length - 1];
+          if (last?.senderRole === 'SCANNER') {
+            showIncoming({
+              sessionId,
+              vehicleName: session.vehicleName,
+              vehicleNumber: session.vehicleNumber,
+              preview: last.body,
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    const onOpenChat = (event: Event) => {
+      const sessionId = (event as CustomEvent<{ sessionId: string }>).detail?.sessionId;
+      if (sessionId) void openChat(sessionId, { navigate: false });
+    };
+
+    window.addEventListener('qrhorn:incoming-chat', onIncomingChatPush);
+    window.addEventListener('qrhorn:open-chat', onOpenChat);
+    window.addEventListener('qrhorn:ping', onIncomingChatPush);
 
     return () => {
       unsubIncoming();
       unsubMsg();
       unsubSession();
-      window.removeEventListener('qrhorn:incoming-chat', onPush);
-      window.removeEventListener('qrhorn:ping', onPush);
+      window.removeEventListener('qrhorn:incoming-chat', onIncomingChatPush);
+      window.removeEventListener('qrhorn:open-chat', onOpenChat);
+      window.removeEventListener('qrhorn:ping', onIncomingChatPush);
     };
-  }, [owner?.id, refreshSessions]);
+  }, [owner?.id, refreshSessions, showIncoming, openChat]);
 
   return (
     <ChatContext.Provider
@@ -178,7 +273,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         sessions,
         activeSession,
         loadingSession,
+        unreadCount,
         openChat,
+        replyToChat,
         dismissIncoming,
         refreshSessions,
         sendOwnerMessage,

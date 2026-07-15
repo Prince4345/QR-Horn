@@ -1,6 +1,16 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
 
+function chatSessionIdFromUrl(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const parsed = url.startsWith('http') ? new URL(url) : new URL(url, window.location.origin);
+    return parsed.searchParams.get('chat');
+  } catch {
+    return null;
+  }
+}
+
 export interface FirebasePublicConfig {
   apiKey: string | null;
   authDomain: string | null;
@@ -112,6 +122,11 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
             window.history.replaceState(null, '', data.url);
           }
           window.dispatchEvent(new CustomEvent('qrhorn:incoming-chat'));
+          if (document.visibilityState === 'visible') {
+            window.dispatchEvent(new CustomEvent('qrhorn:open-chat', {
+              detail: { sessionId: data.sessionId ?? chatSessionIdFromUrl(data.url) },
+            }));
+          }
         }
         window.dispatchEvent(new CustomEvent('qrhorn:ping'));
       });

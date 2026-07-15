@@ -68,6 +68,17 @@ export function buildChatUrl(sessionId: string, basePath?: string): string {
   return url.pathname + url.search;
 }
 
+/** Owner dashboard deep-link — switches view + opens Messages tab. */
+export function navigateToOwnerChat(sessionId: string) {
+  const url = `/?view=dashboard&chat=${encodeURIComponent(sessionId)}`;
+  window.history.replaceState(null, '', url);
+  window.dispatchEvent(new CustomEvent('qrhorn:open-chat', { detail: { sessionId } }));
+}
+
+export function chatSessionIdFromLocation(): string | null {
+  return new URLSearchParams(window.location.search).get('chat');
+}
+
 export function joinChatAsScanner(sessionId: string, token: string): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = getSharedSocket();

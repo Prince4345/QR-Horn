@@ -96,9 +96,11 @@ function PhoneAlertsBanner({
 interface DashboardProps {
   isActive?: boolean;
   openChatSessionId?: string;
+  initialTab?: 'overview' | 'messages';
+  onTabChange?: (tab: 'overview' | 'messages') => void;
 }
 
-export default function Dashboard({ isActive = true, openChatSessionId }: DashboardProps) {
+export default function Dashboard({ isActive = true, openChatSessionId, initialTab = 'overview', onTabChange }: DashboardProps) {
   const { session, setupComplete, profileLoading, owner, authError, refreshProfile, signOut, clearAuthError } = useAuth();
 
   if (profileLoading && !owner && !authError) {
@@ -141,10 +143,10 @@ export default function Dashboard({ isActive = true, openChatSessionId }: Dashbo
     return <AuthPage />;
   }
 
-  return <DashboardContent isActive={isActive} openChatSessionId={openChatSessionId} />;
+  return <DashboardContent isActive={isActive} openChatSessionId={openChatSessionId} initialTab={initialTab} onTabChange={onTabChange} />;
 }
 
-function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps) {
+function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'overview', onTabChange }: DashboardProps) {
   const { owner, signOut, enablePushNotifications, preparePushNotifications, pushEnabled } = useAuth();
   const {
     sessions,
@@ -163,7 +165,16 @@ function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSticker, setShowSticker] = useState(false);
-  const [detailTab, setDetailTab] = useState<'overview' | 'messages'>('overview');
+  const [detailTab, setDetailTab] = useState<'overview' | 'messages'>(initialTab);
+
+  const setTab = (tab: 'overview' | 'messages') => {
+    setDetailTab(tab);
+    onTabChange?.(tab);
+  };
+
+  useEffect(() => {
+    setDetailTab(initialTab);
+  }, [initialTab]);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showEditVehicle, setShowEditVehicle] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -258,9 +269,9 @@ function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps
 
   useEffect(() => {
     if (!isActive || !openChatSessionId) return;
-    setDetailTab('messages');
+    setTab('messages');
     setShowSticker(false);
-    void openChat(openChatSessionId);
+    void openChat(openChatSessionId, { navigate: false });
   }, [isActive, openChatSessionId, openChat]);
 
   useEffect(() => {
@@ -583,13 +594,13 @@ function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
               <div className="flex gap-2 mb-6">
                 <button
-                  onClick={() => { setDetailTab('overview'); closeOpenChat(); }}
+                  onClick={() => { setTab('overview'); closeOpenChat(); }}
                   className={`px-4 py-2 rounded-xl text-sm font-medium ${detailTab === 'overview' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
                   Overview
                 </button>
                 <button
-                  onClick={() => setDetailTab('messages')}
+                  onClick={() => setTab('messages')}
                   className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'messages' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
                 >
                   <MessageSquare className="w-4 h-4" />
@@ -609,7 +620,7 @@ function DashboardContent({ isActive = true, openChatSessionId }: DashboardProps
                       sessions.map((s) => (
                         <button
                           key={s.id}
-                          onClick={() => void openChat(s.id)}
+                          onClick={() => void openChat(s.id, { navigate: false })}
                           className={`w-full text-left p-3 rounded-xl border transition-colors ${
                             openSessionId === s.id ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
                           }`}

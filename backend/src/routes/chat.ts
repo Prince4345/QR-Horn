@@ -168,7 +168,7 @@ router.post('/sessions/:sessionId/messages', requireAuth, async (req: AuthReques
       return;
     }
 
-    emitChatMessage(req.params.sessionId, result.message, result.session);
+    emitChatMessage(req.params.sessionId, req.ownerId!, result.message, result.session);
     emitChatSessionUpdate(req.ownerId, result.session);
 
     res.json({ message: result.message, session: result.session });
@@ -301,7 +301,7 @@ router.post('/scanner/:sessionId/messages', async (req, res) => {
       return;
     }
 
-    emitChatMessage(req.params.sessionId, result.message, result.session);
+    emitChatMessage(req.params.sessionId, result.ownerId, result.message, result.session);
     emitChatSessionUpdate(result.ownerId, result.session);
     emitIncomingChat(result.ownerId, {
       sessionId: req.params.sessionId,

@@ -261,9 +261,16 @@ export function emitIncomingCall(
   io.to(`owner:${ownerId}`).emit('call:incoming', payload);
 }
 
-export function emitChatMessage(sessionId: string, message: ChatMessageDto, session: ChatSessionDto) {
+export function emitChatMessage(
+  sessionId: string,
+  ownerId: string,
+  message: ChatMessageDto,
+  session: ChatSessionDto
+) {
   if (!io) return;
-  io.to(`chat:${sessionId}`).emit('chat:message', { sessionId, message, session });
+  const payload = { sessionId, message, session };
+  io.to(`chat:${sessionId}`).emit('chat:message', payload);
+  io.to(`owner:${ownerId}`).emit('chat:message', payload);
 }
 
 export function emitChatSessionUpdate(ownerId: string, session: ChatSessionDto) {

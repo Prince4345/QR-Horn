@@ -8,39 +8,54 @@ import ScannerView from './components/ScannerView';
 import Dashboard from './components/Dashboard';
 import IncomingCallModal from './components/IncomingCallModal';
 import IncomingChatModal from './components/IncomingChatModal';
-import { LayoutDashboard, QrCode } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, QrCode } from 'lucide-react';
 import { parseScanCodeFromPath } from './lib/scanUrl';
+import { useAuth } from './context/AuthContext';
+import { useChat } from './context/ChatContext';
 
 function getInitialState() {
   const code = parseScanCodeFromPath(window.location.pathname);
   const params = new URLSearchParams(window.location.search);
-  // Push notifications deep-link owners straight to the dashboard
-  const wantsDashboard =
-    !code && params.get('view') === 'dashboard';
+  const chat = params.get('chat');
+  const wantsDashboard = !code && (params.get('view') === 'dashboard' || !!chat);
+  const wantsMessages = wantsDashboard && (!!chat || params.get('tab') === 'messages');
   return {
     scanCode: code ?? undefined,
     view: (wantsDashboard ? 'dashboard' : 'scanner') as 'scanner' | 'dashboard',
-    chatSessionId: params.get('chat') ?? undefined,
+    chatSessionId: chat ?? undefined,
+    dashboardTab: (wantsMessages ? 'messages' : 'overview') as 'overview' | 'messages',
   };
 }
 
-export default function App() {
-  const [view, setView] = useState<'scanner' | 'dashboard'>(getInitialState().view);
-  const [scanCode, setScanCode] = useState<string | undefined>(getInitialState().scanCode);
-  const [dashboardChatId, setDashboardChatId] = useState<string | undefined>(getInitialState().chatSessionId);
+function AppNav() {
+  const { owner } = useAuth();
+  const { unreadCount } = useChat();
+  const initial = getInitialState();
+  const [view, setView] = useState<'scanner' | 'dashboard'>(initial.view);
+  const [dashboardTab, setDashboardTab] = useState<'overview' | 'messages'>(initial.dashboardTab);
+  const [dashboardChatId, setDashboardChatId] = useState<string | undefined>(initial.chatSessionId);
+  const [scanCode, setScanCode] = useState<string | undefined>(initial.scanCode);
 
   const syncFromUrl = useCallback(() => {
     const code = parseScanCodeFromPath(window.location.pathname);
     const params = new URLSearchParams(window.location.search);
+    const chat = params.get('chat');
+
     if (code) {
       setScanCode(code);
       setView('scanner');
     } else {
       setScanCode(undefined);
     }
-    const chat = params.get('chat');
-    if (chat) setDashboardChatId(chat);
-    if (params.get('view') === 'dashboard') setView('dashboard');
+
+    if (chat) {
+      setDashboardChatId(chat);
+      setDashboardTab('messages');
+      setView('dashboard');
+    } else if (params.get('view') === 'dashboard') {
+      setView('dashboard');
+      if (params.get('tab') === 'messages') setDashboardTab('messages');
+    }
   }, []);
 
   useEffect(() => {
@@ -49,32 +64,42 @@ export default function App() {
     return () => window.removeEventListener('popstate', syncFromUrl);
   }, [syncFromUrl]);
 
-  // Notification tap on an already-open tab → jump to the dashboard
+  useEffect(() => {
+    const onOpenChat = (event: Event) => {
+      const sessionId = (event as CustomEvent<{ sessionId: string }>).detail?.sessionId;
+      if (!sessionId) return;
+      setView('dashboard');
+      setScanCode(undefined);
+      setDashboardTab('messages');
+      setDashboardChatId(sessionId);
+    };
+    window.addEventListener('qrhorn:open-chat', onOpenChat);
+    return () => window.removeEventListener('qrhorn:open-chat', onOpenChat);
+  }, []);
+
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     const onSwMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'qrhorn:open-dashboard') {
-        setView('dashboard');
-        setScanCode(undefined);
-        const url = event.data?.url as string | undefined;
-        if (url) {
-          window.history.replaceState(null, '', url.startsWith('http') ? new URL(url).pathname + new URL(url).search : url);
+      if (event.data?.type !== 'qrhorn:open-dashboard') return;
+      setView('dashboard');
+      setScanCode(undefined);
+      const url = event.data?.url as string | undefined;
+      if (url) {
+        const parsed = url.startsWith('http') ? new URL(url) : new URL(url, window.location.origin);
+        window.history.replaceState(null, '', parsed.pathname + parsed.search);
+        const chat = parsed.searchParams.get('chat');
+        if (chat) {
+          setDashboardChatId(chat);
+          setDashboardTab('messages');
+          window.dispatchEvent(new CustomEvent('qrhorn:incoming-chat'));
+          return;
         }
-        window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
       }
-      if (event.data?.type === 'qrhorn:open-dashboard' && event.data?.url?.includes('chat=')) {
-        window.dispatchEvent(new CustomEvent('qrhorn:incoming-chat'));
-      }
+      window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
     };
     navigator.serviceWorker.addEventListener('message', onSwMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);
   }, []);
-
-  const openDashboard = () => {
-    setView('dashboard');
-    setScanCode(undefined);
-    window.history.pushState(null, '', '/');
-  };
 
   const openScanner = () => {
     setView('scanner');
@@ -84,12 +109,22 @@ export default function App() {
     }
   };
 
-  return (
-    <div className="min-h-dvh bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
-      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
+  const openDashboard = () => {
+    setView('dashboard');
+    setScanCode(undefined);
+    setDashboardTab('overview');
+    window.history.pushState(null, '', '/?view=dashboard');
+  };
 
-      {/* App navigation — switch between public scanner and owner dashboard */}
+  const openMessages = () => {
+    setView('dashboard');
+    setScanCode(undefined);
+    setDashboardTab('messages');
+    window.history.pushState(null, '', '/?view=dashboard&tab=messages');
+  };
+
+  return (
+    <>
       <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-[max(1rem,env(safe-area-inset-top))] px-3">
         <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-0.5 sm:gap-1 pointer-events-auto max-w-full">
           <button
@@ -102,15 +137,36 @@ export default function App() {
             <span className="sm:hidden">Scan</span>
             <span className="hidden sm:inline">Scanner</span>
           </button>
+          {owner && (
+            <button
+              onClick={openMessages}
+              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 relative ${
+                view === 'dashboard' && dashboardTab === 'messages'
+                  ? 'bg-violet-600/30 text-violet-100'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4 shrink-0" />
+              <span className="sm:hidden">Chat</span>
+              <span className="hidden sm:inline">Messages</span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={openDashboard}
             className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
-              view === 'dashboard' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
+              view === 'dashboard' && dashboardTab !== 'messages'
+                ? 'bg-white/10 text-white'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" />
             <span className="sm:hidden">Owner</span>
-            <span className="hidden sm:inline">Owner dashboard</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </button>
         </div>
       </div>
@@ -120,11 +176,26 @@ export default function App() {
           <ScannerView scanCode={scanCode} />
         </div>
         <div className={view === 'dashboard' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'dashboard'}>
-          <Dashboard isActive={view === 'dashboard'} openChatSessionId={dashboardChatId} />
+          <Dashboard
+            isActive={view === 'dashboard'}
+            openChatSessionId={dashboardChatId}
+            initialTab={dashboardTab}
+            onTabChange={setDashboardTab}
+          />
         </div>
       </main>
       <IncomingCallModal />
       <IncomingChatModal />
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="min-h-dvh bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
+      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
+      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <AppNav />
     </div>
   );
 }

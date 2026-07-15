@@ -3,7 +3,12 @@ import { MessageSquare, X } from 'lucide-react';
 import { useChat } from '../context/ChatContext';
 
 export default function IncomingChatModal() {
-  const { incomingChat, openChat, dismissIncoming } = useChat();
+  const { incomingChat, replyToChat, dismissIncoming } = useChat();
+
+  const handleReply = () => {
+    if (!incomingChat) return;
+    replyToChat(incomingChat.sessionId);
+  };
 
   return (
     <AnimatePresence>
@@ -46,7 +51,7 @@ export default function IncomingChatModal() {
                 Later
               </button>
               <button
-                onClick={() => void openChat(incomingChat.sessionId)}
+                onClick={handleReply}
                 className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-semibold"
               >
                 Reply

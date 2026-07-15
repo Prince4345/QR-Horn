@@ -95,6 +95,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     setChatSessionId(sessionId);
     setScannerToken(token);
     setChatSession(session);
+    setChatOpen(true);
     window.history.replaceState(null, '', buildChatUrl(sessionId));
     void joinChatAsScanner(sessionId, token);
   };
@@ -130,6 +131,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
         scannerToken: existingToken ?? scannerToken ?? undefined,
       });
       attachChatSession(result.sessionId, result.scannerToken, result.session);
+      setChatOpen(true);
       setChatOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start chat');
@@ -217,9 +219,13 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     const unsubSession = subscribeChatSessionUpdates((session) => {
       if (session.id === chatSessionId) setChatSession(session);
     });
+    const poll = setInterval(() => {
+      void api.getScannerChat(chatSessionId, scannerToken).then(setChatSession).catch(() => {});
+    }, 3000);
     return () => {
       unsubMsg();
       unsubSession();
+      clearInterval(poll);
     };
   }, [chatSessionId, scannerToken]);
 
@@ -257,6 +263,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       if (result.chatSessionId && result.scannerToken) {
         const chat = await api.getScannerChat(result.chatSessionId, result.scannerToken);
         attachChatSession(result.chatSessionId, result.scannerToken, chat);
+        setChatOpen(true);
       }
       const session = await VoiceCallSession.beginOutgoing(result.roomId, {
         onPhase: (phase) => {
@@ -484,6 +491,25 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           <AnimatePresence mode="wait">
             {status === 'idle' && (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-6">
+                {chatOpen && chatSession ? (
+                  <div className="flex flex-col min-h-[420px]">
+                    <div className="text-center mb-4">
+                      <p className="text-white/40 text-xs tracking-widest uppercase">Chat with owner</p>
+                      <p className="text-sm text-white/60 mt-1">{scanData.vehicleName}</p>
+                    </div>
+                    <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
+                      <ChatPanel session={chatSession} role="scanner" onSend={sendScannerMessage} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setChatOpen(false)}
+                      className="mt-3 text-xs text-slate-500 hover:text-slate-300"
+                    >
+                      Back to notify / call options
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <div className="space-y-4 mb-8">
                   <p className="text-white/60 text-sm text-center mb-6">Select a reason to contact the owner anonymously.</p>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -532,22 +558,11 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                   <button
                     onClick={() => void startChat()}
                     disabled={chatLoading}
-                    className="w-full py-4 bg-violet-600/80 hover:bg-violet-600 disabled:opacity-50 text-white rounded-3xl font-bold flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-violet-600 hover:bg-violet-600/90 disabled:opacity-50 text-white rounded-3xl font-bold flex items-center justify-center gap-2"
                   >
                     {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MessageSquare className="w-5 h-5" />}
                     Chat Owner
                   </button>
-                  {chatOpen && chatSession && (
-                    <div className="mt-2 p-4 rounded-2xl bg-white/5 border border-white/10 max-h-[360px] overflow-hidden flex flex-col">
-                      <p className="text-xs text-white/50 mb-2 uppercase tracking-wider">Session chat</p>
-                      <ChatPanel
-                        session={chatSession}
-                        role="scanner"
-                        onSend={sendScannerMessage}
-                        compact
-                      />
-                    </div>
-                  )}
                   {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                   <div className="mt-6 flex justify-center items-center gap-2 text-white/30 text-[10px] tracking-widest uppercase">
                     <div className="w-8 h-[1px] bg-white/10" />
@@ -555,6 +570,8 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                     <div className="w-8 h-[1px] bg-white/10" />
                   </div>
                 </div>
+                </>
+                )}
               </motion.div>
             )}
 
@@ -612,15 +629,15 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                   {chatSession && (
                     <button
                       type="button"
-                      onClick={() => setChatOpen((v) => !v)}
+                      onClick={() => setChatOpen(true)}
                       className="w-full min-h-[44px] py-3 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-100 font-medium flex items-center justify-center gap-2"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      {chatOpen ? 'Hide chat' : 'Open chat with owner'}
+                      Open chat
                     </button>
                   )}
                   {chatOpen && chatSession && (
-                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 max-h-[280px] overflow-hidden">
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 max-h-[320px] overflow-hidden">
                       <ChatPanel session={chatSession} role="scanner" onSend={sendScannerMessage} compact />
                     </div>
                   )}
