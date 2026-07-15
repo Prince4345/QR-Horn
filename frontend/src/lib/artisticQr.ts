@@ -20,11 +20,15 @@ function isFinderZone(row: number, col: number, size: number): boolean {
   return inCorner(row, col) || inCorner(row, col - (size - 7)) || inCorner(row - (size - 7), col);
 }
 
-/** Modules covered by the center logo badge (safe with H error correction). */
+/** Modules cleared for the center logo (matches drawCenterLogo badge; safe with H correction). */
+function logoModuleHalfExtent(count: number): number {
+  return count * 0.13;
+}
+
 function isLogoZone(row: number, col: number, count: number): boolean {
   const c = count / 2;
-  const radius = count * 0.12;
-  return Math.abs(row + 0.5 - c) <= radius && Math.abs(col + 0.5 - c) <= radius;
+  const r = logoModuleHalfExtent(count);
+  return Math.abs(row + 0.5 - c) <= r && Math.abs(col + 0.5 - c) <= r;
 }
 
 function drawModule(
@@ -113,46 +117,41 @@ async function drawCenterLogo(
   logoImageDataUrl?: string | null
 ) {
   const cx = size / 2;
-  const badge = size * 0.17;
+  const half = size * 0.13;
+  const pad = half * 0.07;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.25)';
-  ctx.shadowBlur = size * 0.02;
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(cx - badge, cx - badge, badge * 2, badge * 2, badge * 0.45);
+  ctx.roundRect(cx - half, cx - half, half * 2, half * 2, half * 0.2);
   ctx.fill();
   ctx.restore();
 
   if (logoImageDataUrl) {
     try {
       const img = await loadImage(logoImageDataUrl);
-      const inner = badge * 1.72;
+      const inner = half * 2 - pad * 2;
       const scale = Math.min(inner / img.width, inner / img.height);
       const w = img.width * scale;
       const h = img.height * scale;
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(cx - inner / 2, cx - inner / 2, inner, inner, inner * 0.35);
-      ctx.clip();
       ctx.drawImage(img, cx - w / 2, cx - h / 2, w, h);
-      ctx.restore();
       return;
     } catch {
       // fall through to letter
     }
   }
 
+  const letterHalf = half - pad;
   ctx.fillStyle = logoColor;
   ctx.beginPath();
-  ctx.roundRect(cx - badge * 0.78, cx - badge * 0.78, badge * 1.56, badge * 1.56, badge * 0.4);
+  ctx.roundRect(cx - letterHalf, cx - letterHalf, letterHalf * 2, letterHalf * 2, letterHalf * 0.35);
   ctx.fill();
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = `700 ${badge * 1.05}px system-ui, sans-serif`;
+  ctx.font = `700 ${letterHalf * 1.15}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText((logoText || 'Q').charAt(0).toUpperCase(), cx, cx + badge * 0.06);
+  ctx.fillText((logoText || 'Q').charAt(0).toUpperCase(), cx, cx + letterHalf * 0.05);
 }
 
 async function renderPhotoQr(

@@ -18,6 +18,7 @@ import QrCameraScanner from './QrCameraScanner';
 import { getScanUrl } from '../lib/scanUrl';
 import { QR_ART_PRESETS, getArtPreset } from '../lib/qrArtStyles';
 import { api } from '../lib/api';
+import { resolveCenterLogoUrl } from '../lib/brandLogo';
 import { resizeImageDataUrl } from '../lib/imageResize';
 import {
   DEFAULT_STICKER_CUSTOMIZATION,
@@ -100,6 +101,7 @@ export default function StickerStudio({
   const referenceImage = draft.qrReferenceImage ?? customImage;
   const hasBackground = draft.aiDesigned && !!customImage;
   const qrTextureImage = photoStyle ? referenceImage : null;
+  const centerLogo = resolveCenterLogoUrl(draft.centerLogoImage);
 
   const cardBackground = hasBackground
     ? {
@@ -252,7 +254,7 @@ export default function StickerStudio({
                   lightColor={draft.qrLight}
                   imageDataUrl={qrTextureImage}
                   logoText={(draft.headline || 'Q').trim().charAt(0)}
-                  logoImageDataUrl={draft.centerLogoImage}
+                  logoImageDataUrl={centerLogo}
                   withFrame
                   className="max-w-full h-auto"
                 />
@@ -429,7 +431,7 @@ export default function StickerStudio({
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
             <h3 className="text-sm font-semibold text-white mb-2">Center logo</h3>
             <p className="text-xs text-white/40 mb-3">
-              Upload a small icon for the QR center (car, coffee cup, etc.) — or use the headline letter.
+              Your brand logo sits in the QR center by default. Upload a different icon to replace it.
             </p>
             <div className="flex gap-2 items-center">
               <button
@@ -438,23 +440,22 @@ export default function StickerStudio({
                 className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-sm flex items-center justify-center gap-2"
               >
                 <Upload className="w-4 h-4" />
-                {draft.centerLogoImage ? 'Change logo' : 'Upload logo'}
+                {draft.centerLogoImage ? 'Change logo' : 'Upload custom logo'}
               </button>
+              <img
+                src={centerLogo ?? undefined}
+                alt="Center logo"
+                className="w-10 h-10 rounded-lg object-contain bg-white border border-white/20 p-0.5"
+              />
               {draft.centerLogoImage && (
-                <>
-                  <img
-                    src={draft.centerLogoImage}
-                    alt="Center logo"
-                    className="w-10 h-10 rounded-lg object-contain bg-white/10 border border-white/20 p-0.5"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => patch({ centerLogoImage: null })}
-                    className="px-3 py-2.5 rounded-xl bg-red-500/15 text-red-300 hover:bg-red-500/25"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => patch({ centerLogoImage: null })}
+                  className="px-3 py-2.5 rounded-xl bg-red-500/15 text-red-300 hover:bg-red-500/25"
+                  title="Reset to brand logo"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               )}
             </div>
             <input
