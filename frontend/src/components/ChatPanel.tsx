@@ -11,6 +11,8 @@ type ChatPanelProps = {
   compact?: boolean;
   /** Full-height mobile owner chat — no fixed min-heights */
   mobile?: boolean;
+  /** Wide desktop chat pane inside split layout */
+  desktop?: boolean;
 };
 
 type OptimisticMessage = {
@@ -39,6 +41,7 @@ export default function ChatPanel({
   onBlock,
   compact,
   mobile,
+  desktop,
 }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -165,7 +168,7 @@ export default function ChatPanel({
   return (
     <div
       className={`flex flex-col h-full ${
-        mobile ? 'min-h-0' : compact ? 'min-h-[320px]' : 'min-h-[420px]'
+        mobile || desktop ? 'min-h-0' : compact ? 'min-h-[320px]' : 'min-h-[420px]'
       }`}
     >
       {readOnlyBanner && (
@@ -185,7 +188,7 @@ export default function ChatPanel({
           displayMessages.map((m) => (
             <div key={m.id} className={`flex ${m.mine ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm flex items-end gap-2 ${
+                className={`max-w-[85%] md:max-w-[70%] lg:max-w-[60%] px-3 py-2 rounded-2xl text-sm flex items-end gap-2 ${
                   m.optimistic === 'failed'
                     ? 'bg-red-600/30 text-red-100 border border-red-500/40 rounded-br-md'
                     : m.mine
@@ -222,7 +225,7 @@ export default function ChatPanel({
 
       {session.canSend && (
         <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-          <div className={`flex gap-1.5 ${mobile ? 'overflow-x-auto flex-nowrap scrollbar-none pb-0.5' : 'flex-wrap'}`}>
+          <div className={`flex gap-1.5 ${mobile || desktop ? 'overflow-x-auto flex-nowrap scrollbar-none pb-0.5' : 'flex-wrap'}`}>
             {quickReplies.map((q) => (
               <button
                 key={q}
@@ -230,7 +233,7 @@ export default function ChatPanel({
                 disabled={sending}
                 onClick={() => void handleSend(q, true)}
                 className={`px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 disabled:opacity-50 flex items-center gap-1 shrink-0 ${
-                  mobile ? 'whitespace-nowrap' : ''
+                  mobile || desktop ? 'whitespace-nowrap' : ''
                 }`}
               >
                 {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}

@@ -14,6 +14,7 @@ import {
   Search,
   XCircle,
   Camera,
+  ArrowLeft,
   Mic,
   MicOff,
 } from 'lucide-react';
@@ -441,19 +442,27 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
     );
   }
 
+  const isChatFullscreen = chatOpen && chatSession && status === 'idle';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className={`w-full relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 shadow-2xl overflow-hidden flex flex-col ${
+      className={`w-full mx-auto relative bg-gradient-to-b from-[#111] to-[#000] border border-white/10 shadow-2xl overflow-hidden flex flex-col ${
         status === 'calling'
-          ? 'rounded-2xl sm:rounded-[40px] min-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:max-w-md sm:min-h-0'
-          : 'max-w-md rounded-2xl sm:rounded-[40px] overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
+          ? 'max-w-md md:max-w-lg rounded-2xl sm:rounded-[40px] min-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:min-h-0'
+          : isChatFullscreen
+            ? 'max-w-md md:max-w-3xl lg:max-w-5xl rounded-2xl md:rounded-3xl h-[calc(100dvh-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
+            : 'max-w-md md:max-w-lg rounded-2xl sm:rounded-[40px] overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
       }`}
     >
-      <div className={`flex flex-col h-full relative z-10 ${status === 'calling' ? 'p-4 sm:p-8 flex-1' : 'p-5 sm:p-8'}`}>
-        {!scanCode && status !== 'calling' && (
+      <div
+        className={`flex flex-col h-full relative z-10 min-h-0 ${
+          status === 'calling' || isChatFullscreen ? 'p-4 sm:p-6 flex-1' : 'p-5 sm:p-8'
+        }`}
+      >
+        {!scanCode && status !== 'calling' && !isChatFullscreen && (
           <button onClick={handleBack} className="text-sm text-slate-400 hover:text-white transition-colors mb-4 self-start">
             &larr; Back
           </button>
@@ -467,7 +476,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
               {scanData.vehicleNumber}
             </span>
           </div>
-        ) : (
+        ) : !isChatFullscreen ? (
         <div className="text-center mb-8">
           <div className="w-12 h-1 bg-white/20 rounded-full mx-auto mb-4" />
           <p className="text-white/40 text-xs tracking-widest uppercase mb-1">
@@ -485,25 +494,41 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
             </span>
           </div>
         </div>
+        ) : (
+          <div className="flex items-center gap-3 pb-3 mb-2 border-b border-white/10 shrink-0">
+            <button
+              type="button"
+              onClick={() => setChatOpen(false)}
+              className="p-2 -ml-1 rounded-full hover:bg-white/10 text-slate-300"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="font-semibold text-sm truncate">{scanData.vehicleName}</p>
+              <p className="text-[10px] font-mono text-slate-500 truncate">{scanData.vehicleNumber}</p>
+            </div>
+          </div>
         )}
 
-        <div className={status === 'calling' ? 'flex-1 flex flex-col min-h-0' : ''}>
+        <div className={`${status === 'calling' || isChatFullscreen ? 'flex-1 flex flex-col min-h-0' : ''}`}>
           <AnimatePresence mode="wait">
             {status === 'idle' && (
               <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-6">
                 {chatOpen && chatSession ? (
-                  <div className="flex flex-col min-h-[420px]">
-                    <div className="text-center mb-4">
-                      <p className="text-white/40 text-xs tracking-widest uppercase">Chat with owner</p>
-                      <p className="text-sm text-white/60 mt-1">{scanData.vehicleName}</p>
-                    </div>
-                    <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
-                      <ChatPanel session={chatSession} role="scanner" onSend={sendScannerMessage} />
+                  <div className="flex flex-col flex-1 min-h-0">
+                    <div className="flex-1 min-h-0 rounded-2xl bg-white/5 border border-white/10 p-2 md:p-4">
+                      <ChatPanel
+                        session={chatSession}
+                        role="scanner"
+                        onSend={sendScannerMessage}
+                        desktop
+                      />
                     </div>
                     <button
                       type="button"
                       onClick={() => setChatOpen(false)}
-                      className="mt-3 text-xs text-slate-500 hover:text-slate-300"
+                      className="mt-3 text-xs text-slate-500 hover:text-slate-300 shrink-0 md:hidden"
                     >
                       Back to notify / call options
                     </button>

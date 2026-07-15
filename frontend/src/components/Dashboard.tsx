@@ -36,7 +36,7 @@ import {
 } from '../lib/stickerStyle';
 import { useChat } from '../context/ChatContext';
 import ChatPanel from './ChatPanel';
-import OwnerMessagesMobile from './OwnerMessagesMobile';
+import OwnerMessagesView from './OwnerMessagesView';
 
 function formatActivityTime(iso: string) {
   const date = new Date(iso);
@@ -501,10 +501,10 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
     window.history.replaceState(null, '', '/?view=dashboard&tab=messages');
   };
 
-  if (detailTab === 'messages' && isMobile) {
+  if (detailTab === 'messages') {
     return (
       <>
-        <OwnerMessagesMobile
+        <OwnerMessagesView
           sessions={sessions}
           openSessionId={openSessionId}
           activeSession={activeSession}
