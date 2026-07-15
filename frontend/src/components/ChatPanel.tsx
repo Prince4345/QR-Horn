@@ -9,6 +9,8 @@ type ChatPanelProps = {
   onSend: (body: string, isQuickReply?: boolean) => Promise<void>;
   onBlock?: () => Promise<void>;
   compact?: boolean;
+  /** Full-height mobile owner chat — no fixed min-heights */
+  mobile?: boolean;
 };
 
 type OptimisticMessage = {
@@ -36,6 +38,7 @@ export default function ChatPanel({
   onSend,
   onBlock,
   compact,
+  mobile,
 }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -160,7 +163,11 @@ export default function ChatPanel({
           : null;
 
   return (
-    <div className={`flex flex-col ${compact ? 'min-h-[320px]' : 'min-h-[420px]'} h-full`}>
+    <div
+      className={`flex flex-col h-full ${
+        mobile ? 'min-h-0' : compact ? 'min-h-[320px]' : 'min-h-[420px]'
+      }`}
+    >
       {readOnlyBanner && (
         <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
           {readOnlyBanner}
@@ -215,14 +222,16 @@ export default function ChatPanel({
 
       {session.canSend && (
         <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-          <div className="flex flex-wrap gap-1.5">
+          <div className={`flex gap-1.5 ${mobile ? 'overflow-x-auto flex-nowrap scrollbar-none pb-0.5' : 'flex-wrap'}`}>
             {quickReplies.map((q) => (
               <button
                 key={q}
                 type="button"
                 disabled={sending}
                 onClick={() => void handleSend(q, true)}
-                className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 disabled:opacity-50 flex items-center gap-1"
+                className={`px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 disabled:opacity-50 flex items-center gap-1 shrink-0 ${
+                  mobile ? 'whitespace-nowrap' : ''
+                }`}
               >
                 {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                 {q}
@@ -271,7 +280,9 @@ export default function ChatPanel({
         <button
           type="button"
           onClick={() => void onBlock()}
-          className="mt-2 text-xs text-red-400/80 hover:text-red-300 flex items-center gap-1 self-start"
+          className={`mt-2 text-xs text-red-400/80 hover:text-red-300 flex items-center gap-1 self-start ${
+            mobile ? 'px-2 pb-1' : ''
+          }`}
         >
           <ShieldBan className="w-3.5 h-3.5" /> Block this scanner
         </button>

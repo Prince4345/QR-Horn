@@ -171,7 +171,11 @@ function AppNav() {
         </div>
       </div>
 
-      <main className="pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] px-2 sm:px-4 min-h-dvh flex flex-col items-center w-full">
+      <main
+        className={`pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] min-h-dvh flex flex-col items-center w-full ${
+          view === 'dashboard' && dashboardTab === 'messages' ? 'px-0 sm:px-4' : 'px-2 sm:px-4'
+        }`}
+      >
         <div className={view === 'scanner' ? 'w-full flex flex-col items-center' : 'hidden'} aria-hidden={view !== 'scanner'}>
           <ScannerView scanCode={scanCode} />
         </div>

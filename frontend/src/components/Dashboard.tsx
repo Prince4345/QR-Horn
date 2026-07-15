@@ -36,6 +36,7 @@ import {
 } from '../lib/stickerStyle';
 import { useChat } from '../context/ChatContext';
 import ChatPanel from './ChatPanel';
+import OwnerMessagesMobile from './OwnerMessagesMobile';
 
 function formatActivityTime(iso: string) {
   const date = new Date(iso);
@@ -494,6 +495,41 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   }
 
   if (!selectedVehicle) return null;
+
+  const handleMobileChatBack = () => {
+    closeOpenChat();
+    window.history.replaceState(null, '', '/?view=dashboard&tab=messages');
+  };
+
+  if (detailTab === 'messages' && isMobile) {
+    return (
+      <>
+        <OwnerMessagesMobile
+          sessions={sessions}
+          openSessionId={openSessionId}
+          activeSession={activeSession}
+          loadingSession={loadingSession}
+          onSelectChat={(id) => void openChat(id, { navigate: false })}
+          onBack={handleMobileChatBack}
+          onSend={sendOwnerMessage}
+          onBlock={async () => {
+            if (openSessionId) await blockSession(openSessionId);
+          }}
+        />
+        {showAddVehicle && (
+          <AddVehicleModal onClose={() => setShowAddVehicle(false)} onAdded={() => loadVehicles()} />
+        )}
+        {showEditVehicle && selectedVehicle && (
+          <EditVehicleModal
+            vehicle={selectedVehicle}
+            onClose={() => setShowEditVehicle(false)}
+            onSaved={() => loadVehicles()}
+          />
+        )}
+        {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
+      </>
+    );
+  }
 
   return (
     <>
