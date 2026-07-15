@@ -1,7 +1,7 @@
 {
-  "name": "QRHorn",
-  "short_name": "QRHorn",
-  "description": "Anonymous vehicle contact via QR",
+  "name": "Qertify",
+  "short_name": "Qertify",
+  "description": "Anonymous vehicle contact via QR — Qertify",
   "display": "standalone",
   "start_url": "/",
   "background_color": "#050505",

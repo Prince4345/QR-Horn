@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import { Loader2, Shield, Mail, Lock, User, Phone, Chrome } from 'lucide-react';
 import { useAuth, isSupabaseConfigured } from '../context/AuthContext';
+import { APP_NAME } from '../lib/brand';
 
 type AuthMethod = 'email' | 'phone';
 type PhoneStep = 'enter' | 'otp';
@@ -161,12 +162,12 @@ export default function AuthPage() {
           <Shield className="w-7 h-7 text-blue-400" />
         </div>
         <h1 className="text-2xl font-bold mb-1">
-          {needsSetup ? 'Complete your profile' : 'Owner Login'}
+          {needsSetup ? 'Complete your profile' : APP_NAME}
         </h1>
         <p className="text-white/50 text-sm">
           {needsSetup
             ? 'We need your name and mobile number to send SMS alerts when someone contacts your vehicle.'
-            : 'Sign in with Google, phone, or email'}
+            : 'Owner sign in — manage your vehicle stickers and alerts'}
         </p>
       </div>
 

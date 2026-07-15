@@ -7,6 +7,7 @@ import { createVoiceRoom, setRoomCallId } from '../lib/voiceRooms.js';
 import { emitIncomingCall } from '../socket.js';
 import { checkScanActionLimit } from '../lib/rateLimit.js';
 import { ensureChatSession } from '../lib/chatSessions.js';
+import { APP_NAME } from '../lib/brand.js';
 import { nanoid } from 'nanoid';
 
 const router = Router();
@@ -130,7 +131,7 @@ router.get('/by-number/:number', async (req, res) => {
 
     if (!vehicle) {
       res.status(404).json({
-        error: 'This vehicle is not registered with QRHorn',
+        error: `This vehicle is not registered with ${APP_NAME}`,
         registered: false,
       });
       return;
@@ -155,7 +156,7 @@ router.post('/by-number/:number/notify', async (req, res) => {
 
     const vehicle = await findActiveVehicleByPlate(req.params.number);
     if (!vehicle) {
-      res.status(404).json({ error: 'This vehicle is not registered with QRHorn' });
+      res.status(404).json({ error: `This vehicle is not registered with ${APP_NAME}` });
       return;
     }
 
@@ -184,7 +185,7 @@ router.post('/by-number/:number/call', async (req, res) => {
   try {
     const vehicle = await findActiveVehicleByPlate(req.params.number);
     if (!vehicle) {
-      res.status(404).json({ error: 'This vehicle is not registered with QRHorn' });
+      res.status(404).json({ error: `This vehicle is not registered with ${APP_NAME}` });
       return;
     }
 

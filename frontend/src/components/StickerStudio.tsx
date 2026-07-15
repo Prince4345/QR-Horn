@@ -19,6 +19,7 @@ import { getScanUrl } from '../lib/scanUrl';
 import { QR_ART_PRESETS, getArtPreset } from '../lib/qrArtStyles';
 import { api } from '../lib/api';
 import { resolveCenterLogoUrl } from '../lib/brandLogo';
+import { APP_NAME } from '../lib/brand';
 import { resizeImageDataUrl } from '../lib/imageResize';
 import {
   DEFAULT_STICKER_CUSTOMIZATION,
@@ -294,7 +295,7 @@ export default function StickerStudio({
                 )}
 
                 <p className="text-[9px] font-medium tracking-widest uppercase text-center text-white/60">
-                  Powered by QRHorn
+                  Powered by {APP_NAME}
                 </p>
               </div>
             </div>

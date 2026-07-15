@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, Loader2, XCircle } from 'lucide-react';
 import { parseScanCodeFromQrText } from '../lib/scanUrl';
+import { APP_NAME } from '../lib/brand';
 
 interface QrCameraScannerProps {
   onScan: (code: string) => void;
@@ -50,7 +51,7 @@ export default function QrCameraScanner({
       const code = parseScanCodeFromQrText(decoded);
       if (!code) {
         onInvalidRef.current?.(decoded);
-        setError('QR not recognized — make sure you are scanning your QRHorn sticker');
+        setError(`QR not recognized — make sure you are scanning your ${APP_NAME} sticker`);
         return;
       }
       handledRef.current = true;

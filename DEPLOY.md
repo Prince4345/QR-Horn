@@ -1,6 +1,6 @@
-# Deploy QRHorn to production
+# Deploy Qertify to production
 
-This guide gets QRHorn live on **Render** (free tier works). One service runs the API, WebSockets, and the built React app on a single URL — best for QR stickers, voice calls, and auth.
+This guide gets Qertify live on **Render** (free tier works). One service runs the API, WebSockets, and the built React app on a single URL — best for QR stickers, voice calls, and auth.
 
 ## Before you deploy
 
@@ -67,7 +67,7 @@ Leave `VITE_API_URL` **unset** in production so the app uses the same origin as 
 
 ### SMS with Fast2SMS (India — recommended)
 
-QRHorn uses SMS only as a **fallback** when push notifications fail. Voice calls stay free (WebRTC).
+Qertify uses SMS only as a **fallback** when push notifications fail. Voice calls stay free (WebRTC).
 
 #### Step 1 — Create account
 
@@ -110,7 +110,7 @@ Owners must save an **Indian 10-digit mobile** in Profile (e.g. `9876543210` or 
 
 1. Open your live site → log in as owner → Profile → add mobile number
 2. From another device, scan the QR → **Send Notification**
-3. Owner should receive an SMS like: `QRHorn: HONDA (HR60N7731) — Please move your vehicle`
+3. Owner should receive an SMS like: `Qertify: HONDA (HR60N7731) — Please move your vehicle`
 4. Check Render **Logs** if SMS fails (`Fast2SMS failed:` lines)
 
 #### Troubleshooting
@@ -122,7 +122,7 @@ Owners must save an **Indian 10-digit mobile** in Profile (e.g. `9876543210` or 
 | SMS skipped in logs | Owner has no phone or not a valid 10-digit Indian number |
 | IP blocked | Disable Security whitelist or add Render IP |
 
-**Note:** For high-volume or commercial use in India, DLT registration (sender ID + template) may be required. Quick route `q` is fine for personal / low-volume QRHorn use.
+**Note:** For high-volume or commercial use in India, DLT registration (sender ID + template) may be required. Quick route `q` is fine for personal / low-volume Qertify use.
 
 ### Voice calls across networks (TURN)
 

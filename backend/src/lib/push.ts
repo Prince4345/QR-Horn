@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { prisma } from './prisma.js';
+import { APP_NAME } from './brand.js';
 
 let initialized = false;
 
@@ -208,7 +209,7 @@ export async function sendTestPushToOwner(ownerId: string): Promise<PushSendResu
   return sendDataToOwnerDevices(
     ownerId,
     {
-      title: '🔔 QRHorn test',
+      title: `🔔 ${APP_NAME} test`,
       body: 'Push notifications are working on this device.',
       kind: 'notify',
       url: '/?view=dashboard',

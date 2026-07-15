@@ -1,4 +1,5 @@
 import { prisma } from './prisma.js';
+import { APP_NAME } from './brand.js';
 import { formatE164, formatIndianMobile } from './phone.js';
 
 const REASON_TITLES: Record<string, string> = {
@@ -17,7 +18,7 @@ function buildAlertBody(payload: {
   theftMode: boolean;
 }): string {
   const reason = REASON_TITLES[payload.reason] ?? payload.reason;
-  const prefix = payload.theftMode ? 'QRHorn THEFT ALERT' : 'QRHorn';
+  const prefix = payload.theftMode ? `${APP_NAME} THEFT ALERT` : APP_NAME;
   return `${prefix}: ${payload.vehicleName} (${payload.vehicleNumber}) — ${reason}`;
 }
 

@@ -11,6 +11,7 @@ import { attachFrontend } from './serveFrontend.js';
 import { prisma } from './lib/prisma.js';
 import { initSocketServer } from './socket.js';
 import { runChatCleanup } from './lib/chatSessions.js';
+import { APP_NAME } from './lib/brand.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -28,7 +29,7 @@ app.use(express.json({ limit: '10mb' }));
 if (!isProd) {
   app.get('/', (_req, res) => {
     res.json({
-      name: 'QRHorn API',
+      name: `${APP_NAME} API`,
       status: 'running',
       app: 'Open http://localhost:3000 for the web app',
       health: '/api/health',
@@ -74,7 +75,7 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`QRHorn API running on port ${PORT}${isProd ? ' (production)' : ''}`);
+  console.log(`${APP_NAME} API running on port ${PORT}${isProd ? ' (production)' : ''}`);
   if (!isProd) {
     console.log('Dev: open http://localhost:3000 (Vite proxies API)');
   }

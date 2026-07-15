@@ -501,7 +501,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
       const canvas = await captureStickerCanvas();
       downloadStickerPng(
         canvas,
-        `qrhorn-${selectedVehicle.name.replace(/\s+/g, '-').toLowerCase()}-3x4-300dpi.png`
+        `qertify-${selectedVehicle.name.replace(/\s+/g, '-').toLowerCase()}-3x4-300dpi.png`
       );
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to download sticker');
@@ -520,7 +520,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
         canvas,
         selectedVehicle.name,
         selectedVehicle.number,
-        `qrhorn-${selectedVehicle.name.replace(/\s+/g, '-').toLowerCase()}-print.pdf`
+        `qertify-${selectedVehicle.name.replace(/\s+/g, '-').toLowerCase()}-print.pdf`
       );
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to create PDF');

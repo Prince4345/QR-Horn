@@ -43,6 +43,8 @@ import {
   subscribeChatSessionUpdates,
 } from '../lib/chatClient';
 import { playMessageSound } from '../lib/messageSound';
+import { APP_NAME } from '../lib/brand';
+import { APP_NAME } from '../lib/brand';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -316,7 +318,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       setError(
         err instanceof Error
           ? err.message
-          : 'This vehicle is not registered with QRHorn'
+          : `This vehicle is not registered with ${APP_NAME}`
       );
     } finally {
       setLoading(false);
@@ -644,7 +646,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
               <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-red-300 text-sm font-medium">{error}</p>
-                <p className="text-red-400/60 text-xs mt-1">Only vehicles registered with QRHorn can be contacted.</p>
+                <p className="text-red-400/60 text-xs mt-1">Only vehicles registered with {APP_NAME} can be contacted.</p>
               </div>
             </div>
           )}
@@ -683,7 +685,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           <AlertTriangle className="w-8 h-8 text-red-400" />
         </div>
         <h2 className="text-xl font-semibold mb-2">Not Registered</h2>
-        <p className="text-white/50 text-sm mb-6">{error ?? 'This vehicle is not registered with QRHorn.'}</p>
+        <p className="text-white/50 text-sm mb-6">{error ?? `This vehicle is not registered with ${APP_NAME}.`}</p>
         <button onClick={handleBack} className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm">
           Try Again
         </button>
@@ -878,7 +880,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
                   {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                   <div className="mt-6 flex justify-center items-center gap-2 text-white/30 text-[10px] tracking-widest uppercase">
                     <div className="w-8 h-[1px] bg-white/10" />
-                    <span>Powered by QRHorn</span>
+                    <span>Powered by {APP_NAME}</span>
                     <div className="w-8 h-[1px] bg-white/10" />
                   </div>
                 </div>

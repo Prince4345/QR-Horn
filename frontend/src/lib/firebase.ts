@@ -1,5 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, type Messaging } from 'firebase/messaging';
+import { APP_NAME } from './brand';
 
 function chatSessionIdFromUrl(url?: string): string | null {
   if (!url) return null;
@@ -77,7 +78,7 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
     if (!onMessageBound) {
       onMessage(messaging, (payload) => {
         const data = payload.data ?? {};
-        const title = data.title ?? payload.notification?.title ?? 'QRHorn';
+        const title = data.title ?? payload.notification?.title ?? APP_NAME;
         const body = data.body ?? payload.notification?.body ?? 'New vehicle contact';
         const isCall = data.kind === 'call';
         const isChat = data.kind === 'chat';

@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas';
 
-/** Preview width in the sticker editor (px). */
+import { APP_NAME } from './brand';
 export const STICKER_PREVIEW_WIDTH_PX = 300;
 
 /** Print size: 3×4 inches at 300 DPI. */
@@ -54,7 +54,7 @@ export async function createStickerPdf(
 
   pdf.setFontSize(11);
   pdf.setTextColor(100);
-  pdf.text('QRHorn Vehicle Sticker', pageW / 2, 10, { align: 'center' });
+  pdf.text(`${APP_NAME} Vehicle Sticker`, pageW / 2, 10, { align: 'center' });
   pdf.setFontSize(9);
   pdf.text(`${vehicleName} · ${vehicleNumber}`, pageW / 2, 14, { align: 'center' });
 

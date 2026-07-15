@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, requireOwner, type AuthRequest } from '../lib/auth.js';
 import { normalizePlate } from '../lib/plates.js';
 import { parseStickerCustomization } from '../lib/stickerStyle.js';
+import { APP_NAME } from '../lib/brand.js';
 import { isGeminiConfigured, generateFullStickerCard } from '../lib/gemini.js';
 
 const router = Router();
@@ -92,7 +93,7 @@ router.post('/', async (req: AuthRequest, res) => {
     const existing = await prisma.vehicle.findFirst({ where: { numberNormalized } });
 
     if (existing) {
-      res.status(409).json({ error: 'This vehicle number is already registered with QRHorn' });
+      res.status(409).json({ error: `This vehicle number is already registered with ${APP_NAME}` });
       return;
     }
 
@@ -192,7 +193,7 @@ router.patch('/:id', async (req: AuthRequest, res) => {
         where: { numberNormalized, NOT: { id: vehicle.id } },
       });
       if (existing) {
-        res.status(409).json({ error: 'This vehicle number is already registered with QRHorn' });
+        res.status(409).json({ error: `This vehicle number is already registered with ${APP_NAME}` });
         return;
       }
     }
