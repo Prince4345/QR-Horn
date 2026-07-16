@@ -16,6 +16,7 @@ import {
   Bell,
   Pencil,
   ChevronDown,
+  FolderLock,
 } from 'lucide-react';
 import { api, type Vehicle, type Activity } from '../lib/api';
 import { playPingSound } from '../lib/pingSound';
@@ -38,6 +39,7 @@ import {
 import { useChat } from '../context/ChatContext';
 import ChatPanel from './ChatPanel';
 import OwnerMessagesView from './OwnerMessagesView';
+import VehicleVault from './VehicleVault';
 
 function getActivityDateGroup(iso: string) {
   const date = new Date(iso);
@@ -262,15 +264,16 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSticker, setShowSticker] = useState(false);
-  const [detailTab, setDetailTab] = useState<'overview' | 'messages'>(initialTab);
+  const [detailTab, setDetailTab] = useState<'overview' | 'messages' | 'vault'>(initialTab === 'messages' ? 'messages' : 'overview');
 
-  const setTab = (tab: 'overview' | 'messages') => {
+  const setTab = (tab: 'overview' | 'messages' | 'vault') => {
     setDetailTab(tab);
-    onTabChange?.(tab);
+    if (tab === 'overview' || tab === 'messages') onTabChange?.(tab);
   };
 
   useEffect(() => {
-    setDetailTab(initialTab);
+    if (initialTab === 'messages') setDetailTab('messages');
+    else if (initialTab === 'overview') setDetailTab('overview');
   }, [initialTab]);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showEditVehicle, setShowEditVehicle] = useState(false);
@@ -763,9 +766,23 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                     <span className="px-1.5 py-0.5 rounded-full bg-blue-600 text-[10px] font-bold">{sessions.length}</span>
                   )}
                 </button>
+                <button
+                  onClick={() => setTab('vault')}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'vault' ? 'bg-violet-600/25 text-violet-100' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <FolderLock className="w-4 h-4" />
+                  Vault
+                </button>
               </div>
 
-              {detailTab === 'messages' ? (
+              {detailTab === 'vault' ? (
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scroll">
+                  <VehicleVault
+                    vehicleId={selectedVehicle.id}
+                    vehicleVerified={selectedVehicle.verified}
+                  />
+                </div>
+              ) : detailTab === 'messages' ? (
                 <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
                   <div className="lg:w-56 shrink-0 space-y-2 max-h-48 lg:max-h-none overflow-y-auto">
                     {sessions.length === 0 ? (
@@ -810,7 +827,14 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">{selectedVehicle.name}</h1>
-                  <span className="px-3 py-1 rounded-md bg-white/10 font-mono text-sm tracking-widest text-slate-300">{selectedVehicle.number}</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-md bg-white/10 font-mono text-sm tracking-widest text-slate-300">{selectedVehicle.number}</span>
+                    {selectedVehicle.verified && (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-semibold text-emerald-300 uppercase tracking-wider">
+                        RC verified
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2 items-start sm:items-end">
                   <div className="flex flex-wrap gap-2">

@@ -105,6 +105,27 @@ export interface VehicleVerifyResult {
   checks: VehicleVerifyChecks;
 }
 
+export type VaultExpiryStatus = 'none' | 'ok' | 'soon' | 'expired';
+
+export interface VaultDocumentMeta {
+  id: string;
+  type: 'RC' | 'INSURANCE' | 'PUC' | 'DRIVING_LICENSE' | 'VEHICLE_PHOTO';
+  photoSlot: string | null;
+  fileName: string;
+  mimeType: string;
+  expiresAt: string | null;
+  expiryStatus: VaultExpiryStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VaultSummary {
+  uploaded: number;
+  totalSlots: number;
+  expiringSoon: number;
+  expired: number;
+}
+
 export interface Activity {
   id: string;
   type: 'notification' | 'call' | 'chat';
@@ -212,6 +233,49 @@ export const api = {
     request<{ success: boolean }>(`/api/vehicles/${vehicleId}`, { method: 'DELETE' }),
 
   getActivity: (vehicleId: string) => request<Activity[]>(`/api/vehicles/${vehicleId}/activity`),
+
+  getVehicleVault: (vehicleId: string) =>
+    request<{ documents: VaultDocumentMeta[]; summary: VaultSummary }>(
+      `/api/vehicles/${vehicleId}/vault`
+    ),
+
+  getVaultDocumentFile: (vehicleId: string, docId: string) =>
+    request<{
+      id: string;
+      type: string;
+      photoSlot: string | null;
+      fileName: string;
+      mimeType: string;
+      dataUrl: string;
+      expiresAt: string | null;
+    }>(`/api/vehicles/${vehicleId}/vault/${docId}/file`),
+
+  uploadVaultDocument: (
+    vehicleId: string,
+    data: {
+      type: string;
+      photoSlot?: string | null;
+      fileDataUrl: string;
+      fileName?: string;
+      expiresAt?: string | null;
+    }
+  ) =>
+    request<VaultDocumentMeta>(`/api/vehicles/${vehicleId}/vault`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 60000,
+    }),
+
+  updateVaultDocumentExpiry: (vehicleId: string, docId: string, expiresAt: string | null) =>
+    request<VaultDocumentMeta>(`/api/vehicles/${vehicleId}/vault/${docId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ expiresAt }),
+    }),
+
+  deleteVaultDocument: (vehicleId: string, docId: string) =>
+    request<{ success: boolean }>(`/api/vehicles/${vehicleId}/vault/${docId}`, {
+      method: 'DELETE',
+    }),
 
   updateTheftMode: (vehicleId: string, theftMode: boolean) =>
     request<{ id: string; theftMode: boolean }>(`/api/vehicles/${vehicleId}/theft-mode`, {

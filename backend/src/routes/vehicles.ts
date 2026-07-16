@@ -8,6 +8,14 @@ import { parseStickerCustomization } from '../lib/stickerStyle.js';
 import { APP_NAME } from '../lib/brand.js';
 import { isGeminiConfigured, generateFullStickerCard } from '../lib/gemini.js';
 import { verifyRcDocument, verifyPlatePhoto, consumeVerification } from '../lib/vehicleVerification.js';
+import {
+  getExpiryStatus,
+  isPhotoSlot,
+  parseVaultType,
+  VAULT_EXPIRY_TYPES,
+  VAULT_PHOTO_SLOTS,
+} from '../lib/vault.js';
+import type { VaultDocumentType } from '@prisma/client';
 
 const router = Router();
 
@@ -405,6 +413,291 @@ router.patch('/:id/theft-mode', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('PATCH /api/vehicles/:id/theft-mode:', error);
     res.status(500).json({ error: 'Failed to update theft mode' });
+  }
+});
+
+function mapVaultDocument(doc: {
+  id: string;
+  type: VaultDocumentType;
+  photoSlot: string;
+  fileName: string;
+  mimeType: string;
+  expiresAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: doc.id,
+    type: doc.type,
+    photoSlot: doc.photoSlot || null,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    expiresAt: doc.expiresAt?.toISOString() ?? null,
+    expiryStatus: getExpiryStatus(doc.expiresAt),
+    createdAt: doc.createdAt.toISOString(),
+    updatedAt: doc.updatedAt.toISOString(),
+  };
+}
+
+const MAX_VAULT_BYTES = 4 * 1024 * 1024;
+
+router.get('/:id/vault', async (req: AuthRequest, res) => {
+  try {
+    const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const docs = await prisma.vehicleDocument.findMany({
+      where: { vehicleId: vehicle.id },
+      orderBy: [{ type: 'asc' }, { photoSlot: 'asc' }],
+      select: {
+        id: true,
+        type: true,
+        photoSlot: true,
+        fileName: true,
+        mimeType: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const uploaded = docs.length;
+    const totalSlots = 4 + 4; // 4 single docs + 4 photo slots
+    const expiringSoon = docs.filter((d) => getExpiryStatus(d.expiresAt) === 'soon').length;
+    const expired = docs.filter((d) => getExpiryStatus(d.expiresAt) === 'expired').length;
+
+    res.json({
+      documents: docs.map(mapVaultDocument),
+      summary: { uploaded, totalSlots, expiringSoon, expired },
+    });
+  } catch (error) {
+    console.error('GET /api/vehicles/:id/vault:', error);
+    res.status(500).json({ error: 'Failed to load vault' });
+  }
+});
+
+router.get('/:id/vault/:docId/file', async (req: AuthRequest, res) => {
+  try {
+    const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const doc = await prisma.vehicleDocument.findFirst({
+      where: { id: req.params.docId, vehicleId: vehicle.id },
+    });
+    if (!doc) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    res.json({
+      id: doc.id,
+      type: doc.type,
+      photoSlot: doc.photoSlot || null,
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      dataUrl: doc.fileData.startsWith('data:')
+        ? doc.fileData
+        : `data:${doc.mimeType};base64,${doc.fileData}`,
+      expiresAt: doc.expiresAt?.toISOString() ?? null,
+    });
+  } catch (error) {
+    console.error('GET /api/vehicles/:id/vault/:docId/file:', error);
+    res.status(500).json({ error: 'Failed to load document' });
+  }
+});
+
+router.post('/:id/vault', async (req: AuthRequest, res) => {
+  try {
+    const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const { type, photoSlot, fileDataUrl, fileName, expiresAt } = req.body as {
+      type?: string;
+      photoSlot?: string | null;
+      fileDataUrl?: string;
+      fileName?: string;
+      expiresAt?: string | null;
+    };
+
+    const docType = type ? parseVaultType(type) : null;
+    if (!docType) {
+      res.status(400).json({ error: 'Invalid document type' });
+      return;
+    }
+
+    if (!fileDataUrl?.startsWith('data:image/') && !fileDataUrl?.startsWith('data:application/pdf')) {
+      res.status(400).json({ error: 'Upload a JPEG, PNG, or PDF file' });
+      return;
+    }
+
+    const mimeMatch = fileDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!mimeMatch) {
+      res.status(400).json({ error: 'Invalid file data' });
+      return;
+    }
+
+    const mimeType = mimeMatch[1];
+    const base64 = mimeMatch[2];
+    const byteLen = Math.ceil((base64.length * 3) / 4);
+    if (byteLen > MAX_VAULT_BYTES) {
+      res.status(400).json({ error: 'File too large. Use a photo under 4 MB.' });
+      return;
+    }
+
+    let slot = '';
+    if (docType === 'VEHICLE_PHOTO') {
+      if (!photoSlot || !isPhotoSlot(photoSlot)) {
+        res.status(400).json({ error: `photoSlot must be one of: ${VAULT_PHOTO_SLOTS.join(', ')}` });
+        return;
+      }
+      slot = photoSlot;
+    }
+
+    let parsedExpiry: Date | null = null;
+    if (expiresAt) {
+      parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime())) {
+        res.status(400).json({ error: 'Invalid expiry date' });
+        return;
+      }
+    } else if (VAULT_EXPIRY_TYPES.includes(docType) && expiresAt === undefined) {
+      parsedExpiry = null;
+    }
+
+    const safeName =
+      fileName?.trim().slice(0, 120) ||
+      `${docType.toLowerCase()}${slot ? `-${slot}` : ''}.${mimeType.includes('pdf') ? 'pdf' : 'jpg'}`;
+
+    const doc = await prisma.vehicleDocument.upsert({
+      where: {
+        vehicleId_type_photoSlot: {
+          vehicleId: vehicle.id,
+          type: docType,
+          photoSlot: slot,
+        },
+      },
+      create: {
+        vehicleId: vehicle.id,
+        type: docType,
+        photoSlot: slot,
+        fileName: safeName,
+        mimeType,
+        fileData: fileDataUrl,
+        expiresAt: parsedExpiry,
+      },
+      update: {
+        fileName: safeName,
+        mimeType,
+        fileData: fileDataUrl,
+        expiresAt: parsedExpiry,
+      },
+      select: {
+        id: true,
+        type: true,
+        photoSlot: true,
+        fileName: true,
+        mimeType: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(201).json(mapVaultDocument(doc));
+  } catch (error) {
+    console.error('POST /api/vehicles/:id/vault:', error);
+    res.status(500).json({ error: 'Failed to save document' });
+  }
+});
+
+router.patch('/:id/vault/:docId', async (req: AuthRequest, res) => {
+  try {
+    const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const { expiresAt } = req.body as { expiresAt?: string | null };
+    const doc = await prisma.vehicleDocument.findFirst({
+      where: { id: req.params.docId, vehicleId: vehicle.id },
+    });
+    if (!doc) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    if (!VAULT_EXPIRY_TYPES.includes(doc.type)) {
+      res.status(400).json({ error: 'This document type does not support expiry dates' });
+      return;
+    }
+
+    let parsedExpiry: Date | null = null;
+    if (expiresAt) {
+      parsedExpiry = new Date(expiresAt);
+      if (Number.isNaN(parsedExpiry.getTime())) {
+        res.status(400).json({ error: 'Invalid expiry date' });
+        return;
+      }
+    } else if (expiresAt === null) {
+      parsedExpiry = null;
+    } else {
+      res.status(400).json({ error: 'expiresAt is required' });
+      return;
+    }
+
+    const updated = await prisma.vehicleDocument.update({
+      where: { id: doc.id },
+      data: { expiresAt: parsedExpiry },
+      select: {
+        id: true,
+        type: true,
+        photoSlot: true,
+        fileName: true,
+        mimeType: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.json(mapVaultDocument(updated));
+  } catch (error) {
+    console.error('PATCH /api/vehicles/:id/vault/:docId:', error);
+    res.status(500).json({ error: 'Failed to update document' });
+  }
+});
+
+router.delete('/:id/vault/:docId', async (req: AuthRequest, res) => {
+  try {
+    const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Vehicle not found' });
+      return;
+    }
+
+    const doc = await prisma.vehicleDocument.findFirst({
+      where: { id: req.params.docId, vehicleId: vehicle.id },
+    });
+    if (!doc) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    await prisma.vehicleDocument.delete({ where: { id: doc.id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/vehicles/:id/vault/:docId:', error);
+    res.status(500).json({ error: 'Failed to delete document' });
   }
 });
 

@@ -54,8 +54,35 @@ model Vehicle {
   chatSessions     ChatSession[]
   blockedScanners  ChatBlockedScanner[]
   verification     VehicleVerification?
+  documents        VehicleDocument[]
 
   @@index([ownerId])
+}
+
+model VehicleDocument {
+  id        String            @id @default(uuid())
+  vehicleId String
+  type      VaultDocumentType
+  photoSlot String            @default("")
+  fileName  String
+  mimeType  String
+  fileData  String            @db.Text
+  expiresAt DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  vehicle   Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, type, photoSlot])
+  @@index([vehicleId])
+  @@index([expiresAt])
+}
+
+enum VaultDocumentType {
+  RC
+  INSURANCE
+  PUC
+  DRIVING_LICENSE
+  VEHICLE_PHOTO
 }
 
 model VehicleVerification {
