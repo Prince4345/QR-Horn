@@ -7,7 +7,7 @@ import { normalizePlate } from '../lib/plates.js';
 import { parseStickerCustomization } from '../lib/stickerStyle.js';
 import { APP_NAME } from '../lib/brand.js';
 import { isGeminiConfigured, generateFullStickerCard } from '../lib/gemini.js';
-import { verifyVehicleDocuments, consumeVerification } from '../lib/vehicleVerification.js';
+import { verifyRcDocument, verifyPlatePhoto, consumeVerification } from '../lib/vehicleVerification.js';
 
 const router = Router();
 
@@ -76,7 +76,7 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/verify', async (req: AuthRequest, res) => {
+router.post('/verify-rc', async (req: AuthRequest, res) => {
   try {
     if (!isGeminiConfigured()) {
       res.status(503).json({
@@ -87,26 +87,13 @@ router.post('/verify', async (req: AuthRequest, res) => {
       return;
     }
 
-    const { rcImageDataUrl, plateImageDataUrl, typedPlate } = req.body as {
-      rcImageDataUrl?: string;
-      plateImageDataUrl?: string;
-      typedPlate?: string;
-    };
+    const { rcImageDataUrl } = req.body as { rcImageDataUrl?: string };
 
-    if (!rcImageDataUrl?.startsWith('data:image/') || !plateImageDataUrl?.startsWith('data:image/')) {
+    if (!rcImageDataUrl?.startsWith('data:image/')) {
       res.status(400).json({
         ok: false,
         reason: 'unreadable',
-        message: 'Upload both RC and plate photos (JPEG or PNG).',
-      });
-      return;
-    }
-
-    if (!typedPlate?.trim()) {
-      res.status(400).json({
-        ok: false,
-        reason: 'typed_plate_mismatch',
-        message: 'Type your plate number to confirm what we read.',
+        message: 'Upload an RC photo (JPEG or PNG).',
       });
       return;
     }
@@ -124,23 +111,86 @@ router.post('/verify', async (req: AuthRequest, res) => {
       return;
     }
 
-    const result = await verifyVehicleDocuments(
+    const result = await verifyRcDocument(req.ownerId!, owner.name, rcImageDataUrl);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('POST /api/vehicles/verify-rc:', error);
+    res.status(500).json({
+      ok: false,
+      reason: 'unreadable',
+      message: 'Failed to read RC. Try again.',
+    });
+  }
+});
+
+router.post('/verify-plate', async (req: AuthRequest, res) => {
+  try {
+    if (!isGeminiConfigured()) {
+      res.status(503).json({
+        ok: false,
+        reason: 'gemini_unavailable',
+        message: 'Document verification is not configured. Add GEMINI_API_KEY to the server.',
+      });
+      return;
+    }
+
+    const { verificationId, plateImageDataUrl, typedPlate } = req.body as {
+      verificationId?: string;
+      plateImageDataUrl?: string;
+      typedPlate?: string;
+    };
+
+    if (!verificationId?.trim()) {
+      res.status(400).json({
+        ok: false,
+        reason: 'verification_not_found',
+        message: 'RC verification required. Upload your RC first.',
+      });
+      return;
+    }
+
+    if (!plateImageDataUrl?.startsWith('data:image/')) {
+      res.status(400).json({
+        ok: false,
+        reason: 'unreadable',
+        message: 'Upload a plate photo (JPEG or PNG).',
+      });
+      return;
+    }
+
+    if (!typedPlate?.trim()) {
+      res.status(400).json({
+        ok: false,
+        reason: 'typed_plate_mismatch',
+        message: 'Type your plate number to confirm what we read.',
+      });
+      return;
+    }
+
+    const result = await verifyPlatePhoto(
       req.ownerId!,
-      owner.name,
-      rcImageDataUrl,
+      verificationId.trim(),
       plateImageDataUrl,
       typedPlate
     );
 
     res.status(200).json(result);
   } catch (error) {
-    console.error('POST /api/vehicles/verify:', error);
+    console.error('POST /api/vehicles/verify-plate:', error);
     res.status(500).json({
       ok: false,
       reason: 'unreadable',
-      message: 'Failed to verify documents. Try again.',
+      message: 'Failed to verify plate. Try again.',
     });
   }
+});
+
+router.post('/verify', async (req: AuthRequest, res) => {
+  res.status(410).json({
+    ok: false,
+    reason: 'unreadable',
+    message: 'Use /verify-rc then /verify-plate in separate steps.',
+  });
 });
 
 router.post('/', async (req: AuthRequest, res) => {

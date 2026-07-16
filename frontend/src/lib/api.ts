@@ -178,12 +178,19 @@ export const api = {
 
   getVehicle: (vehicleId: string) => request<Vehicle>(`/api/vehicles/${vehicleId}`),
 
-  verifyVehicleDocuments: (data: {
-    rcImageDataUrl: string;
+  verifyRcDocument: (data: { rcImageDataUrl: string }) =>
+    request<VehicleVerifyResult>('/api/vehicles/verify-rc', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    }),
+
+  verifyPlatePhoto: (data: {
+    verificationId: string;
     plateImageDataUrl: string;
     typedPlate: string;
   }) =>
-    request<VehicleVerifyResult>('/api/vehicles/verify', {
+    request<VehicleVerifyResult>('/api/vehicles/verify-plate', {
       method: 'POST',
       body: JSON.stringify(data),
       timeoutMs: 90000,

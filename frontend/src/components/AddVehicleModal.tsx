@@ -10,6 +10,7 @@ import {
   Check,
   AlertTriangle,
   ChevronLeft,
+  ChevronRight,
   Shield,
 } from 'lucide-react';
 import { api, type VehicleVerifyResult } from '../lib/api';
@@ -52,7 +53,8 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
   const [typedPlate, setTypedPlate] = useState('');
   const [name, setName] = useState('');
   const [type, setType] = useState<'car' | 'bike'>('car');
-  const [verifyResult, setVerifyResult] = useState<VehicleVerifyResult | null>(null);
+  const [rcResult, setRcResult] = useState<VehicleVerifyResult | null>(null);
+  const [plateResult, setPlateResult] = useState<VehicleVerifyResult | null>(null);
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +65,10 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
     setError(null);
     try {
       setRcPreview(await readImageFile(file));
-      setVerifyResult(null);
+      setRcResult(null);
+      setPlateResult(null);
       setVerificationId(null);
+      setTypedPlate('');
     } catch {
       setError('Could not read RC image');
     }
@@ -77,35 +81,53 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
     setError(null);
     try {
       setPlatePreview(await readImageFile(file));
-      setVerifyResult(null);
-      setVerificationId(null);
+      setPlateResult(null);
     } catch {
       setError('Could not read plate photo');
     }
     e.target.value = '';
   };
 
-  const runVerification = async () => {
-    if (!rcPreview || !platePreview || !typedPlate.trim()) return;
+  const runRcVerification = async () => {
+    if (!rcPreview) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await api.verifyVehicleDocuments({
-        rcImageDataUrl: rcPreview,
+      const result = await api.verifyRcDocument({ rcImageDataUrl: rcPreview });
+      setRcResult(result);
+      if (result.ok && result.verificationId) {
+        setVerificationId(result.verificationId);
+        if (result.extracted.rcPlate) setTypedPlate(result.extracted.rcPlate);
+        if (result.extracted.vehicleName) setName(result.extracted.vehicleName);
+        if (result.extracted.vehicleType) setType(result.extracted.vehicleType);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read RC');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runPlateVerification = async () => {
+    if (!verificationId || !platePreview || !typedPlate.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.verifyPlatePhoto({
+        verificationId,
         plateImageDataUrl: platePreview,
         typedPlate: typedPlate.trim(),
       });
-      setVerifyResult(result);
-      if (result.ok && result.verificationId) {
-        setVerificationId(result.verificationId);
-        if (result.extracted.vehicleName && !name) setName(result.extracted.vehicleName);
-        if (result.extracted.vehicleType) setType(result.extracted.vehicleType);
+      setPlateResult(result);
+      if (result.ok) {
         setStep(3);
       } else {
         setError(result.message);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+      setError(err instanceof Error ? err.message : 'Plate verification failed');
     } finally {
       setLoading(false);
     }
@@ -128,11 +150,13 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
   };
 
   const stepTitles: Record<Step, string> = {
-    1: 'Upload RC',
-    2: 'Plate photo',
+    1: 'Read RC',
+    2: 'Verify plate',
     3: 'Confirm details',
     4: 'Done',
   };
+
+  const rcVerified = rcResult?.ok === true;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -150,7 +174,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           <h2 className="text-xl sm:text-2xl font-bold">Verify & Add Vehicle</h2>
         </div>
         <p className="text-white/50 text-sm mb-4">
-          Step {step} of 3 — {stepTitles[step]}
+          Step {Math.min(step, 3)} of 3 — {stepTitles[step]}
         </p>
 
         <div className="flex gap-1.5 mb-6">
@@ -166,8 +190,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           {step === 1 && (
             <motion.div key="s1" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <p className="text-sm text-white/60 mb-4">
-                Upload a clear photo of your vehicle Registration Certificate (RC). Documents are used only for
-                verification and are not stored.
+                Upload your RC first. We&apos;ll read it and fetch vehicle details before the plate step.
               </p>
               <input ref={rcInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRcFile} />
               <button
@@ -184,22 +207,82 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                   </>
                 )}
               </button>
+
+              {rcPreview && !rcVerified && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void runRcVerification()}
+                  className="w-full mt-3 py-3 bg-white/10 hover:bg-white/15 disabled:opacity-50 rounded-2xl font-medium flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Reading RC…
+                    </>
+                  ) : (
+                    'Read RC & fetch details'
+                  )}
+                </button>
+              )}
+
+              {rcResult && (
+                <div
+                  className={`mt-4 rounded-2xl p-4 space-y-2 ${
+                    rcResult.ok
+                      ? 'bg-emerald-500/10 border border-emerald-500/30'
+                      : 'bg-red-500/10 border border-red-500/30'
+                  }`}
+                >
+                  {rcResult.ok ? (
+                    <>
+                      <p className="text-sm font-semibold text-emerald-200">Details from RC</p>
+                      {rcResult.extracted.rcPlate && (
+                        <p className="font-mono text-lg tracking-wider">{rcResult.extracted.rcPlate}</p>
+                      )}
+                      {rcResult.extracted.ownerNameOnRc && (
+                        <p className="text-xs text-white/60">Owner: {rcResult.extracted.ownerNameOnRc}</p>
+                      )}
+                      {rcResult.extracted.vehicleName && (
+                        <p className="text-xs text-white/60">Vehicle: {rcResult.extracted.vehicleName}</p>
+                      )}
+                      <CheckRow ok={rcResult.checks.ownerNameMatch} label="RC owner matches your account" />
+                      {rcResult.checks.lowConfidenceWarning && (
+                        <p className="text-amber-300 text-xs flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                          Low confidence — double-check the plate above.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-red-300 text-sm">{rcResult.message}</p>
+                  )}
+                </div>
+              )}
+
               {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+
               <button
                 type="button"
-                disabled={!rcPreview}
+                disabled={!rcVerified}
                 onClick={() => { setError(null); setStep(2); }}
-                className="w-full mt-4 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold"
+                className="w-full mt-4 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold flex items-center justify-center gap-2"
               >
-                Next
+                Next — verify plate <ChevronRight className="w-4 h-4" />
               </button>
             </motion.div>
           )}
 
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
+              {rcResult?.extracted.rcPlate && (
+                <div className="mb-4 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm">
+                  <span className="text-white/50">Plate from RC: </span>
+                  <span className="font-mono font-medium">{rcResult.extracted.rcPlate}</span>
+                </div>
+              )}
               <p className="text-sm text-white/60 mb-4">
-                Upload a clear photo of your number plate, then type the plate number so we can confirm the read.
+                Now upload a photo of your number plate. It must match the RC plate above.
               </p>
               <input ref={plateInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePlateFile} />
               <button
@@ -219,7 +302,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
               <input
                 value={typedPlate}
                 onChange={(e) => setTypedPlate(e.target.value.toUpperCase())}
-                placeholder="Type plate number (e.g. DL 8C AA 1111)"
+                placeholder="Confirm plate number (e.g. DL 8C AA 1111)"
                 className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-emerald-500/50 font-mono tracking-wider"
               />
               {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
@@ -233,35 +316,32 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                 </button>
                 <button
                   type="button"
-                  disabled={!platePreview || !typedPlate.trim() || loading}
-                  onClick={() => void runVerification()}
+                  disabled={!platePreview || !typedPlate.trim() || !verificationId || loading}
+                  onClick={() => void runPlateVerification()}
                   className="flex-1 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Reading documents…
+                      Reading plate…
                     </>
                   ) : (
-                    'Verify documents'
+                    'Verify plate photo'
                   )}
                 </button>
               </div>
             </motion.div>
           )}
 
-          {step === 3 && verifyResult?.ok && (
+          {step === 3 && plateResult?.ok && (
             <motion.form key="s3" onSubmit={handleSubmit} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 mb-4 space-y-2">
-                <p className="text-sm font-semibold text-emerald-200">Detected from your documents</p>
-                <p className="font-mono text-lg tracking-wider">{verifyResult.extracted.rcPlate ?? typedPlate}</p>
-                <CheckRow ok={verifyResult.checks.platesMatch} label="RC plate matches plate photo" />
-                <CheckRow ok={verifyResult.checks.typedPlateMatch} label="Typed plate matches OCR" />
-                <CheckRow ok={verifyResult.checks.ownerNameMatch} label="RC owner matches your account" />
-                {verifyResult.extracted.ownerNameOnRc && (
-                  <p className="text-xs text-white/50">Owner on RC: {verifyResult.extracted.ownerNameOnRc}</p>
-                )}
-                {verifyResult.checks.lowConfidenceWarning && (
+                <p className="text-sm font-semibold text-emerald-200">All checks passed</p>
+                <p className="font-mono text-lg tracking-wider">{plateResult.extracted.rcPlate ?? typedPlate}</p>
+                <CheckRow ok={plateResult.checks.platesMatch} label="RC plate matches plate photo" />
+                <CheckRow ok={plateResult.checks.typedPlateMatch} label="Typed plate matches OCR" />
+                <CheckRow ok={plateResult.checks.ownerNameMatch} label="RC owner matches your account" />
+                {plateResult.checks.lowConfidenceWarning && (
                   <p className="text-amber-300 text-xs flex items-center gap-1.5 mt-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                     Low confidence read — double-check the plate above.

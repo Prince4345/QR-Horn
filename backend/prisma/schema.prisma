@@ -80,6 +80,7 @@ model VehicleVerification {
 }
 
 enum VerificationStatus {
+  RC_VERIFIED
   READY
   CONSUMED
   EXPIRED
