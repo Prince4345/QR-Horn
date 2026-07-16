@@ -563,7 +563,9 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
       <>
         <div className="w-full max-w-md text-center py-16">
           <h2 className="text-2xl font-bold mb-2">Welcome, {owner?.name}</h2>
-          <p className="text-white/50 text-sm mb-8">Add your first vehicle to get a QR sticker and start receiving contact requests.</p>
+          <p className="text-white/50 text-sm mb-8">
+            Verify your RC and plate to add a vehicle and get a QR sticker.
+          </p>
           {!pushEnabled && (
             <div className="mb-6">
               <PhoneAlertsBanner

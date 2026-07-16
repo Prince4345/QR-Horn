@@ -1,28 +1,125 @@
-import { useState, type FormEvent } from 'react';
-import { motion } from 'motion/react';
-import { X, Car, Bike, Loader2 } from 'lucide-react';
-import { api } from '../lib/api';
+import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  X,
+  Car,
+  Bike,
+  Loader2,
+  FileText,
+  Camera,
+  Check,
+  AlertTriangle,
+  ChevronLeft,
+  Shield,
+} from 'lucide-react';
+import { api, type VehicleVerifyResult } from '../lib/api';
+import { resizeImageDataUrl } from '../lib/imageResize';
+import { APP_NAME } from '../lib/brand';
 
 interface AddVehicleModalProps {
   onClose: () => void;
   onAdded: () => void;
 }
 
+type Step = 1 | 2 | 3 | 4;
+
+async function readImageFile(file: File): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+  return resizeImageDataUrl(dataUrl, 1600, 2000, 'image/jpeg');
+}
+
+function CheckRow({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-sm ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+      {ok ? <Check className="w-4 h-4 shrink-0" /> : <X className="w-4 h-4 shrink-0" />}
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalProps) {
+  const rcInputRef = useRef<HTMLInputElement>(null);
+  const plateInputRef = useRef<HTMLInputElement>(null);
+
+  const [step, setStep] = useState<Step>(1);
+  const [rcPreview, setRcPreview] = useState<string | null>(null);
+  const [platePreview, setPlatePreview] = useState<string | null>(null);
+  const [typedPlate, setTypedPlate] = useState('');
   const [name, setName] = useState('');
-  const [number, setNumber] = useState('');
   const [type, setType] = useState<'car' | 'bike'>('car');
+  const [verifyResult, setVerifyResult] = useState<VehicleVerifyResult | null>(null);
+  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleRcFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      setRcPreview(await readImageFile(file));
+      setVerifyResult(null);
+      setVerificationId(null);
+    } catch {
+      setError('Could not read RC image');
+    }
+    e.target.value = '';
+  };
+
+  const handlePlateFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      setPlatePreview(await readImageFile(file));
+      setVerifyResult(null);
+      setVerificationId(null);
+    } catch {
+      setError('Could not read plate photo');
+    }
+    e.target.value = '';
+  };
+
+  const runVerification = async () => {
+    if (!rcPreview || !platePreview || !typedPlate.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      await api.addVehicle({ name: name.trim(), number: number.trim(), type });
+      const result = await api.verifyVehicleDocuments({
+        rcImageDataUrl: rcPreview,
+        plateImageDataUrl: platePreview,
+        typedPlate: typedPlate.trim(),
+      });
+      setVerifyResult(result);
+      if (result.ok && result.verificationId) {
+        setVerificationId(result.verificationId);
+        if (result.extracted.vehicleName && !name) setName(result.extracted.vehicleName);
+        if (result.extracted.vehicleType) setType(result.extracted.vehicleType);
+        setStep(3);
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!verificationId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await api.addVehicle({ verificationId, name: name.trim(), type });
+      setStep(4);
       onAdded();
-      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add vehicle');
     } finally {
@@ -30,65 +127,212 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
     }
   };
 
+  const stepTitles: Record<Step, string> = {
+    1: 'Upload RC',
+    2: 'Plate photo',
+    3: 'Confirm details',
+    4: 'Done',
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-8 relative"
+        className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6 sm:p-8 relative max-h-[90dvh] overflow-y-auto"
       >
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-2xl font-bold mb-2">Add Vehicle</h2>
-        <p className="text-white/50 text-sm mb-6">Register a vehicle and get a QR sticker instantly.</p>
+        <div className="flex items-center gap-2 mb-1">
+          <Shield className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-xl sm:text-2xl font-bold">Verify & Add Vehicle</h2>
+        </div>
+        <p className="text-white/50 text-sm mb-4">
+          Step {step} of 3 — {stepTitles[step]}
+        </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Vehicle name (e.g. Honda City)"
-            required
-            className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
-          />
-          <input
-            value={number}
-            onChange={(e) => setNumber(e.target.value.toUpperCase())}
-            placeholder="License plate (e.g. DL 8C AA 1111)"
-            required
-            className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50 font-mono tracking-wider"
-          />
+        <div className="flex gap-1.5 mb-6">
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              className={`h-1 flex-1 rounded-full ${step >= s ? 'bg-emerald-500' : 'bg-white/10'}`}
+            />
+          ))}
+        </div>
 
-          <div className="flex gap-3">
-            {(['car', 'bike'] as const).map((t) => {
-              const Icon = t === 'car' ? Car : Bike;
-              return (
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div key="s1" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
+              <p className="text-sm text-white/60 mb-4">
+                Upload a clear photo of your vehicle Registration Certificate (RC). Documents are used only for
+                verification and are not stored.
+              </p>
+              <input ref={rcInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRcFile} />
+              <button
+                type="button"
+                onClick={() => rcInputRef.current?.click()}
+                className="w-full py-10 rounded-2xl border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 flex flex-col items-center gap-3 transition-colors"
+              >
+                {rcPreview ? (
+                  <img src={rcPreview} alt="RC preview" className="max-h-40 rounded-lg object-contain" />
+                ) : (
+                  <>
+                    <FileText className="w-10 h-10 text-emerald-400/80" />
+                    <span className="text-sm font-medium">Tap to upload RC</span>
+                  </>
+                )}
+              </button>
+              {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+              <button
+                type="button"
+                disabled={!rcPreview}
+                onClick={() => { setError(null); setStep(2); }}
+                className="w-full mt-4 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold"
+              >
+                Next
+              </button>
+            </motion.div>
+          )}
+
+          {step === 2 && (
+            <motion.div key="s2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
+              <p className="text-sm text-white/60 mb-4">
+                Upload a clear photo of your number plate, then type the plate number so we can confirm the read.
+              </p>
+              <input ref={plateInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePlateFile} />
+              <button
+                type="button"
+                onClick={() => plateInputRef.current?.click()}
+                className="w-full py-8 rounded-2xl border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 flex flex-col items-center gap-3 mb-4 transition-colors"
+              >
+                {platePreview ? (
+                  <img src={platePreview} alt="Plate preview" className="max-h-32 rounded-lg object-contain" />
+                ) : (
+                  <>
+                    <Camera className="w-10 h-10 text-emerald-400/80" />
+                    <span className="text-sm font-medium">Tap to upload plate photo</span>
+                  </>
+                )}
+              </button>
+              <input
+                value={typedPlate}
+                onChange={(e) => setTypedPlate(e.target.value.toUpperCase())}
+                placeholder="Type plate number (e.g. DL 8C AA 1111)"
+                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-emerald-500/50 font-mono tracking-wider"
+              />
+              {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+              <div className="flex gap-2 mt-4">
                 <button
-                  key={t}
                   type="button"
-                  onClick={() => setType(t)}
-                  className={`flex-1 py-3 rounded-2xl border flex items-center justify-center gap-2 capitalize ${
-                    type === t ? 'bg-blue-600/20 border-blue-500/50 text-white' : 'bg-white/5 border-white/10 text-slate-400'
-                  }`}
+                  onClick={() => { setError(null); setStep(1); }}
+                  className="px-4 py-3 rounded-2xl bg-white/10 flex items-center gap-1"
                 >
-                  <Icon className="w-5 h-5" />
-                  {t}
+                  <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-              );
-            })}
-          </div>
+                <button
+                  type="button"
+                  disabled={!platePreview || !typedPlate.trim() || loading}
+                  onClick={() => void runVerification()}
+                  className="flex-1 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Reading documents…
+                    </>
+                  ) : (
+                    'Verify documents'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          )}
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {step === 3 && verifyResult?.ok && (
+            <motion.form key="s3" onSubmit={handleSubmit} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
+              <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 mb-4 space-y-2">
+                <p className="text-sm font-semibold text-emerald-200">Detected from your documents</p>
+                <p className="font-mono text-lg tracking-wider">{verifyResult.extracted.rcPlate ?? typedPlate}</p>
+                <CheckRow ok={verifyResult.checks.platesMatch} label="RC plate matches plate photo" />
+                <CheckRow ok={verifyResult.checks.typedPlateMatch} label="Typed plate matches OCR" />
+                <CheckRow ok={verifyResult.checks.ownerNameMatch} label="RC owner matches your account" />
+                {verifyResult.extracted.ownerNameOnRc && (
+                  <p className="text-xs text-white/50">Owner on RC: {verifyResult.extracted.ownerNameOnRc}</p>
+                )}
+                {verifyResult.checks.lowConfidenceWarning && (
+                  <p className="text-amber-300 text-xs flex items-center gap-1.5 mt-2">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    Low confidence read — double-check the plate above.
+                  </p>
+                )}
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading || !name.trim() || !number.trim()}
-            className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add & Generate QR'}
-          </button>
-        </form>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Vehicle name (e.g. Honda City)"
+                required
+                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-emerald-500/50 mb-3"
+              />
+
+              <div className="flex gap-3 mb-4">
+                {(['car', 'bike'] as const).map((t) => {
+                  const Icon = t === 'car' ? Car : Bike;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setType(t)}
+                      className={`flex-1 py-3 rounded-2xl border flex items-center justify-center gap-2 capitalize ${
+                        type === t ? 'bg-emerald-600/20 border-emerald-500/50 text-white' : 'bg-white/5 border-white/10 text-slate-400'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setError(null); setStep(2); }}
+                  className="px-4 py-3 rounded-2xl bg-white/10 flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading || !name.trim() || !verificationId}
+                  className="flex-1 py-3 bg-emerald-600 disabled:opacity-40 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Add & Generate QR
+                </button>
+              </div>
+            </motion.form>
+          )}
+
+          {step === 4 && (
+            <motion.div key="s4" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Vehicle verified & added</h3>
+              <p className="text-white/50 text-sm mb-6">
+                Your {APP_NAME} QR sticker is ready. Design and print it from the dashboard.
+              </p>
+              <button type="button" onClick={onClose} className="w-full py-3 bg-emerald-600 rounded-2xl font-semibold">
+                Done
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

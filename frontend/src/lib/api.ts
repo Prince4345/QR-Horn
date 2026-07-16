@@ -32,14 +32,16 @@ async function authHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeoutMs = options?.timeoutMs ?? 15000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const { timeoutMs: _t, ...fetchOptions } = options ?? {};
     const res = await fetch(`${getApiBase()}${path}`, {
-      headers: { ...(await authHeaders()), ...options?.headers },
-      ...options,
+      headers: { ...(await authHeaders()), ...fetchOptions?.headers },
+      ...fetchOptions,
       signal: controller.signal,
     });
 
@@ -66,12 +68,41 @@ export interface Vehicle {
   type: 'car' | 'bike';
   active: boolean;
   theftMode: boolean;
+  verified: boolean;
+  verifiedAt: string | null;
   stickerCode: string | null;
   stickerTheme: string;
   stickerCustomImage: string | null;
   stickerCustomization?: import('./stickerStyle').StickerCustomization;
   totalPings: number;
   callsMasked: number;
+}
+
+export interface VehicleVerifyChecks {
+  platesMatch: boolean;
+  typedPlateMatch: boolean;
+  ownerNameMatch: boolean;
+  ownerNameScore: number;
+  confidence: number;
+  lowConfidenceWarning: boolean;
+}
+
+export interface VehicleVerifyExtracted {
+  rcPlate: string | null;
+  photoPlate: string | null;
+  ownerNameOnRc: string | null;
+  vehicleName: string | null;
+  vehicleType: 'car' | 'bike' | null;
+}
+
+export interface VehicleVerifyResult {
+  ok: boolean;
+  reason?: string;
+  message: string;
+  verificationId?: string;
+  expiresAt?: string;
+  extracted: VehicleVerifyExtracted;
+  checks: VehicleVerifyChecks;
 }
 
 export interface Activity {
@@ -147,7 +178,18 @@ export const api = {
 
   getVehicle: (vehicleId: string) => request<Vehicle>(`/api/vehicles/${vehicleId}`),
 
-  addVehicle: (data: { name: string; number: string; type: 'car' | 'bike' }) =>
+  verifyVehicleDocuments: (data: {
+    rcImageDataUrl: string;
+    plateImageDataUrl: string;
+    typedPlate: string;
+  }) =>
+    request<VehicleVerifyResult>('/api/vehicles/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    }),
+
+  addVehicle: (data: { verificationId: string; name: string; type: 'car' | 'bike' }) =>
     request<Vehicle>('/api/vehicles', { method: 'POST', body: JSON.stringify(data) }),
 
   updateVehicle: (

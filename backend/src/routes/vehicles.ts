@@ -7,6 +7,7 @@ import { normalizePlate } from '../lib/plates.js';
 import { parseStickerCustomization } from '../lib/stickerStyle.js';
 import { APP_NAME } from '../lib/brand.js';
 import { isGeminiConfigured, generateFullStickerCard } from '../lib/gemini.js';
+import { verifyVehicleDocuments, consumeVerification } from '../lib/vehicleVerification.js';
 
 const router = Router();
 
@@ -19,6 +20,8 @@ function mapVehicle(v: {
   type: VehicleType;
   active: boolean;
   theftMode: boolean;
+  verified: boolean;
+  verifiedAt: Date | null;
   sticker: {
     code: string;
     themeId: string;
@@ -34,6 +37,8 @@ function mapVehicle(v: {
     type: v.type,
     active: v.active,
     theftMode: v.theftMode,
+    verified: v.verified,
+    verifiedAt: v.verifiedAt?.toISOString() ?? null,
     stickerCode: v.sticker?.code ?? null,
     stickerTheme: v.sticker?.themeId ?? 'default',
     stickerCustomImage: v.sticker?.customImageData ?? null,
@@ -71,16 +76,91 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 });
 
+router.post('/verify', async (req: AuthRequest, res) => {
+  try {
+    if (!isGeminiConfigured()) {
+      res.status(503).json({
+        ok: false,
+        reason: 'gemini_unavailable',
+        message: 'Document verification is not configured. Add GEMINI_API_KEY to the server.',
+      });
+      return;
+    }
+
+    const { rcImageDataUrl, plateImageDataUrl, typedPlate } = req.body as {
+      rcImageDataUrl?: string;
+      plateImageDataUrl?: string;
+      typedPlate?: string;
+    };
+
+    if (!rcImageDataUrl?.startsWith('data:image/') || !plateImageDataUrl?.startsWith('data:image/')) {
+      res.status(400).json({
+        ok: false,
+        reason: 'unreadable',
+        message: 'Upload both RC and plate photos (JPEG or PNG).',
+      });
+      return;
+    }
+
+    if (!typedPlate?.trim()) {
+      res.status(400).json({
+        ok: false,
+        reason: 'typed_plate_mismatch',
+        message: 'Type your plate number to confirm what we read.',
+      });
+      return;
+    }
+
+    const owner = await prisma.owner.findUnique({
+      where: { id: req.ownerId! },
+      select: { name: true },
+    });
+    if (!owner?.name?.trim()) {
+      res.status(400).json({
+        ok: false,
+        reason: 'owner_mismatch',
+        message: 'Complete your profile name before verifying a vehicle.',
+      });
+      return;
+    }
+
+    const result = await verifyVehicleDocuments(
+      req.ownerId!,
+      owner.name,
+      rcImageDataUrl,
+      plateImageDataUrl,
+      typedPlate
+    );
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('POST /api/vehicles/verify:', error);
+    res.status(500).json({
+      ok: false,
+      reason: 'unreadable',
+      message: 'Failed to verify documents. Try again.',
+    });
+  }
+});
+
 router.post('/', async (req: AuthRequest, res) => {
   try {
-    const { name, number, type } = req.body as {
+    const { name, number, type, verificationId } = req.body as {
       name?: string;
       number?: string;
       type?: VehicleType;
+      verificationId?: string;
     };
 
-    if (!name?.trim() || !number?.trim()) {
-      res.status(400).json({ error: 'Name and vehicle number are required' });
+    if (!verificationId?.trim()) {
+      res.status(400).json({
+        error: 'Vehicle verification required. Upload your RC and plate photo first.',
+      });
+      return;
+    }
+
+    if (!name?.trim()) {
+      res.status(400).json({ error: 'Vehicle name is required' });
       return;
     }
 
@@ -89,27 +169,40 @@ router.post('/', async (req: AuthRequest, res) => {
       return;
     }
 
-    const numberNormalized = normalizePlate(number);
-    const existing = await prisma.vehicle.findFirst({ where: { numberNormalized } });
-
-    if (existing) {
-      res.status(409).json({ error: `This vehicle number is already registered with ${APP_NAME}` });
+    const consumed = await consumeVerification(verificationId.trim(), req.ownerId!, name.trim(), type);
+    if ('error' in consumed) {
+      res.status(400).json({ error: consumed.error });
       return;
     }
 
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        ownerId: req.ownerId!,
-        name: name.trim(),
-        number: number.trim().toUpperCase(),
-        numberNormalized,
-        type,
-        sticker: { create: { code: nanoid(10), themeId: 'default' } },
-      },
-      include: {
-        sticker: { select: { code: true, themeId: true, customImageData: true, customization: true } },
-        _count: { select: { notifications: true, calls: true } },
-      },
+    const { verification } = consumed;
+    const numberNormalized = verification.plateNormalized;
+    const numberValue = verification.plateDisplay;
+
+    const vehicle = await prisma.$transaction(async (tx) => {
+      const created = await tx.vehicle.create({
+        data: {
+          ownerId: req.ownerId!,
+          name: name.trim(),
+          number: numberValue,
+          numberNormalized,
+          type,
+          verified: true,
+          verifiedAt: new Date(),
+          sticker: { create: { code: nanoid(10), themeId: 'default' } },
+        },
+        include: {
+          sticker: { select: { code: true, themeId: true, customImageData: true, customization: true } },
+          _count: { select: { notifications: true, calls: true } },
+        },
+      });
+
+      await tx.vehicleVerification.update({
+        where: { id: verification.id },
+        data: { status: 'CONSUMED', vehicleId: created.id },
+      });
+
+      return created;
     });
 
     res.status(201).json(mapVehicle(vehicle));

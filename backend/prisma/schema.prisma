@@ -34,25 +34,55 @@ model OwnerPushToken {
 }
 
 model Vehicle {
-  id               String         @id @default(uuid())
+  id               String                @id @default(uuid())
   ownerId          String
   name             String
   number           String
-  numberNormalized String         @unique @default("")
+  numberNormalized String                @unique @default("")
   type             VehicleType
-  active           Boolean        @default(true)
-  theftMode        Boolean        @default(false)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  owner            Owner          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  active           Boolean               @default(true)
+  theftMode        Boolean               @default(false)
+  verified         Boolean               @default(false)
+  verifiedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  owner            Owner                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   sticker          Sticker?
   notifications    Notification[]
   calls            Call[]
   activities       Activity[]
   chatSessions     ChatSession[]
   blockedScanners  ChatBlockedScanner[]
+  verification     VehicleVerification?
 
   @@index([ownerId])
+}
+
+model VehicleVerification {
+  id              String             @id @default(uuid())
+  ownerId         String
+  rcFingerprint   String             @unique
+  plateNormalized String
+  plateDisplay    String
+  ownerNameOnRc   String
+  ownerNameScore  Float
+  confidence      Float
+  suggestedName   String?
+  suggestedType   VehicleType?
+  status          VerificationStatus @default(READY)
+  expiresAt       DateTime
+  vehicleId       String?            @unique
+  createdAt       DateTime           @default(now())
+  vehicle         Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([expiresAt])
+}
+
+enum VerificationStatus {
+  READY
+  CONSUMED
+  EXPIRED
 }
 
 model Sticker {
