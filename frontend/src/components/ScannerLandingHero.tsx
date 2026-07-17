@@ -37,7 +37,7 @@ export default function ScannerLandingHero({ hidden }: ScannerLandingHeroProps) 
     }
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && video.paused) void start();
+      if (document.visibilityState === 'visible' && video.paused && !video.ended) void start();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
@@ -57,7 +57,6 @@ export default function ScannerLandingHero({ hidden }: ScannerLandingHeroProps) 
         }`}
         src="/hero-drift.mp4"
         autoPlay
-        loop
         muted
         playsInline
         preload="auto"
