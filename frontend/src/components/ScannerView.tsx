@@ -525,17 +525,24 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
 
   // Landing — QR scan instructions + vehicle number lookup
   if (!scanData && !loading && !scanCode) {
+    const steps = [
+      { icon: QrCode, label: 'Scan QR', desc: 'Point at the sticker' },
+      { icon: HelpCircle, label: 'Pick reason', desc: 'Move, lights, parking…' },
+      { icon: MessageSquare, label: 'Contact', desc: 'Chat or call owner' },
+    ] as const;
+
     return (
-      <div className="relative w-[100vw] max-w-none left-1/2 -translate-x-1/2 min-h-[calc(100dvh-4.5rem-env(safe-area-inset-top))] flex flex-col">
+      <>
         <ScannerLandingHero hidden={showCamera} />
 
-        <motion.div
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.75, type: 'spring', stiffness: 90, damping: 20 }}
-          className="relative z-10 mt-auto w-full max-w-md mx-auto px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
-        >
-          <div className="w-full bg-white/[0.07] border border-white/15 rounded-2xl sm:rounded-[40px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl ring-1 ring-white/5">
+        <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-5 px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(11rem+env(safe-area-inset-top))] sm:gap-6 sm:pt-[calc(12rem+env(safe-area-inset-top))]">
+          <motion.div
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.65, type: 'spring', stiffness: 100, damping: 22 }}
+            className="w-full max-w-md"
+          >
+            <div className="w-full overflow-hidden rounded-2xl border border-white/20 bg-black/45 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl ring-1 ring-white/10 sm:rounded-[40px]">
         <div className="flex border-b border-white/10">
           <button
             onClick={() => { setEntryTab('qr'); setError(null); }}
@@ -657,18 +664,49 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
             </div>
           )}
         </div>
-          </div>
-        </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45, duration: 0.5 }}
+            className="grid w-full max-w-md grid-cols-3 gap-2 sm:gap-3"
+          >
+            {steps.map(({ icon: Icon, label, desc }) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-white/10 bg-black/35 px-2 py-3 text-center backdrop-blur-md sm:px-3 sm:py-4"
+              >
+                <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
+                  <Icon className="h-4 w-4 text-blue-300 sm:h-5 sm:w-5" />
+                </div>
+                <p className="text-[11px] font-semibold text-white sm:text-xs">{label}</p>
+                <p className="mt-0.5 text-[10px] leading-tight text-white/45 sm:text-[11px]">{desc}</p>
+              </div>
+            ))}
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55 }}
+            className="text-center text-xs text-white/40"
+          >
+            Vehicle owner? Open Dashboard to manage stickers &amp; chats.
+          </motion.p>
+        </div>
 
         {showCamera && (
           <QrCameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />
         )}
-      </div>
+      </>
     );
   }
 
   if (loading) {
     return (
+      <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))]">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -679,11 +717,13 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           {contactMethod === 'plate' ? 'Checking registration...' : 'Loading vehicle...'}
         </p>
       </motion.div>
+      </div>
     );
   }
 
   if (error || !scanData) {
     return (
+      <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))]">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -698,12 +738,14 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           Try Again
         </button>
       </motion.div>
+      </div>
     );
   }
 
   const isChatFullscreen = chatOpen && chatSession && status === 'idle';
 
   return (
+    <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))] w-full">
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1014,5 +1056,6 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-blue-600/10 to-transparent" />
       </div>
     </motion.div>
+    </div>
   );
 }

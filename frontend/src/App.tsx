@@ -179,14 +179,16 @@ function AppNav() {
       </div>
 
       <main
-        className={`pt-[calc(4.5rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] min-h-dvh flex flex-col w-full ${
-          view === 'dashboard' && dashboardTab === 'messages'
-            ? 'px-0 sm:px-4 items-stretch'
-            : 'px-2 sm:px-4 items-center'
+        className={`relative z-10 pb-[calc(1rem+env(safe-area-inset-bottom))] min-h-dvh flex flex-col w-full ${
+          view === 'scanner'
+            ? 'px-0 items-stretch pt-0'
+            : view === 'dashboard' && dashboardTab === 'messages'
+              ? 'px-0 sm:px-4 items-stretch pt-[calc(4.5rem+env(safe-area-inset-top))]'
+              : 'px-2 sm:px-4 items-center pt-[calc(4.5rem+env(safe-area-inset-top))]'
         }`}
       >
         {view === 'scanner' ? (
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center">
+          <div className="w-full flex flex-col items-stretch">
             <Suspense fallback={<ViewLoader />}>
               <ScannerView scanCode={scanCode} />
             </Suspense>
@@ -213,8 +215,6 @@ function AppNav() {
 export default function App() {
   return (
     <div className="min-h-dvh bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
-      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none" />
       <AppNav />
     </div>
   );

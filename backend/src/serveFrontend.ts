@@ -21,7 +21,7 @@ export function attachFrontend(app: Express) {
           res.setHeader('Cache-Control', 'no-cache');
         } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        } else if (/\.(png|jpe?g|svg|ico|webp|woff2?)$/i.test(filePath)) {
+        } else if (/\.(png|jpe?g|svg|ico|webp|woff2?|mp4|webm)$/i.test(filePath)) {
           res.setHeader('Cache-Control', 'public, max-age=86400');
         }
       },
