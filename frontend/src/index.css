@@ -117,3 +117,193 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* Scanner landing — cinematic drift hero */
+.scanner-hero-aurora {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 60%, rgba(59, 130, 246, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 85% 35%, rgba(251, 146, 60, 0.18), transparent 50%),
+    linear-gradient(165deg, #0a0a0f 0%, #050505 45%, #0c0806 100%);
+  animation: hero-aurora-shift 14s ease-in-out infinite alternate;
+}
+
+.scanner-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
+}
+
+.scanner-hero-headlight {
+  position: absolute;
+  width: 42vmin;
+  height: 42vmin;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.35;
+  mix-blend-mode: screen;
+}
+
+.scanner-hero-headlight-a {
+  top: 28%;
+  left: -8%;
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.9) 0%, transparent 68%);
+  animation: hero-headlight-a 6s ease-in-out infinite;
+}
+
+.scanner-hero-headlight-b {
+  bottom: 18%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.75) 0%, transparent 70%);
+  animation: hero-headlight-b 7.5s ease-in-out infinite;
+}
+
+.scanner-hero-speedlines {
+  background: repeating-linear-gradient(
+    -18deg,
+    transparent 0,
+    transparent 42px,
+    rgba(255, 255, 255, 0.025) 42px,
+    rgba(255, 255, 255, 0.025) 43px
+  );
+  mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+  animation: hero-speed-pan 2.8s linear infinite;
+}
+
+.scanner-hero-smoke {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(28px);
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.35) 0%, transparent 70%);
+  opacity: 0;
+}
+
+.scanner-hero-smoke-1 {
+  width: 120px;
+  height: 80px;
+  bottom: 22%;
+  left: 8%;
+  animation: hero-smoke-drift 5.5s ease-out infinite;
+}
+
+.scanner-hero-smoke-2 {
+  width: 160px;
+  height: 100px;
+  bottom: 28%;
+  left: 18%;
+  animation: hero-smoke-drift 6.2s ease-out infinite 0.8s;
+}
+
+.scanner-hero-smoke-3 {
+  width: 90px;
+  height: 70px;
+  bottom: 20%;
+  right: 12%;
+  animation: hero-smoke-drift 5s ease-out infinite 1.4s;
+}
+
+.scanner-hero-smoke-4 {
+  width: 140px;
+  height: 90px;
+  bottom: 32%;
+  right: 22%;
+  animation: hero-smoke-drift 6.8s ease-out infinite 0.3s;
+}
+
+.scanner-hero-smoke-5 {
+  width: 100px;
+  height: 75px;
+  bottom: 26%;
+  left: 42%;
+  animation: hero-smoke-drift 5.8s ease-out infinite 2s;
+}
+
+.scanner-hero-skid::before {
+  content: '';
+  position: absolute;
+  bottom: 26%;
+  left: -10%;
+  width: 55%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.55), transparent);
+  transform: rotate(-8deg);
+  filter: blur(1px);
+  opacity: 0;
+  animation: hero-skid-flash 4.5s ease-in-out infinite;
+}
+
+.scanner-hero-title {
+  background: linear-gradient(120deg, #ffffff 0%, #93c5fd 38%, #fbbf24 72%, #ffffff 100%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: hero-title-shimmer 5s ease-in-out infinite;
+  text-shadow: 0 0 40px rgba(59, 130, 246, 0.25);
+}
+
+@keyframes hero-aurora-shift {
+  0% { filter: hue-rotate(0deg) brightness(1); }
+  100% { filter: hue-rotate(12deg) brightness(1.08); }
+}
+
+@keyframes hero-headlight-a {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.28; }
+  50% { transform: translate(12vw, -4vh) scale(1.15); opacity: 0.42; }
+}
+
+@keyframes hero-headlight-b {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.22; }
+  45% { transform: translate(-10vw, 3vh) scale(1.2); opacity: 0.38; }
+}
+
+@keyframes hero-speed-pan {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-43px); }
+}
+
+@keyframes hero-smoke-drift {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.85); }
+  15% { opacity: 0.55; }
+  100% { opacity: 0; transform: translate(28vw, -8vh) scale(1.35); }
+}
+
+@keyframes hero-skid-flash {
+  0%, 72%, 100% { opacity: 0; transform: rotate(-8deg) scaleX(0.6); }
+  78% { opacity: 0.85; transform: rotate(-8deg) scaleX(1); }
+  88% { opacity: 0; transform: rotate(-8deg) scaleX(1.1); }
+}
+
+@keyframes hero-title-shimmer {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+
+.scanner-hero-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.scanner-hero-card {
+  animation: hero-card-bob 5.5s ease-in-out infinite;
+}
+
+@keyframes hero-card-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-hero-aurora,
+  .scanner-hero-headlight-a,
+  .scanner-hero-headlight-b,
+  .scanner-hero-speedlines,
+  .scanner-hero-smoke,
+  .scanner-hero-skid::before,
+  .scanner-hero-title,
+  .scanner-hero-card {
+    animation: none !important;
+  }
+}

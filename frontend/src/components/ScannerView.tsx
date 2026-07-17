@@ -44,7 +44,7 @@ import {
 } from '../lib/chatClient';
 import { playMessageSound } from '../lib/messageSound';
 import { APP_NAME } from '../lib/brand';
-import { APP_NAME } from '../lib/brand';
+import ScannerLandingHero from './ScannerLandingHero';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -526,11 +526,16 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
   // Landing — QR scan instructions + vehicle number lookup
   if (!scanData && !loading && !scanCode) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] overflow-hidden"
-      >
+      <div className="relative w-[100vw] max-w-none left-1/2 -translate-x-1/2 min-h-[calc(100dvh-4.5rem-env(safe-area-inset-top))] flex flex-col">
+        <ScannerLandingHero hidden={showCamera} />
+
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.75, type: 'spring', stiffness: 90, damping: 20 }}
+          className="relative z-10 mt-auto w-full max-w-md mx-auto px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
+        >
+          <div className="scanner-hero-card w-full bg-white/[0.07] border border-white/15 rounded-2xl sm:rounded-[40px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl ring-1 ring-white/5">
         <div className="flex border-b border-white/10">
           <button
             onClick={() => { setEntryTab('qr'); setError(null); }}
@@ -652,11 +657,13 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
             </div>
           )}
         </div>
+          </div>
+        </motion.div>
 
         {showCamera && (
           <QrCameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />
         )}
-      </motion.div>
+      </div>
     );
   }
 
