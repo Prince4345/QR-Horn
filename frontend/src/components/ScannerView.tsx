@@ -535,7 +535,7 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
           transition={{ delay: 0.35, duration: 0.75, type: 'spring', stiffness: 90, damping: 20 }}
           className="relative z-10 mt-auto w-full max-w-md mx-auto px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
         >
-          <div className="scanner-hero-card w-full bg-white/[0.07] border border-white/15 rounded-2xl sm:rounded-[40px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl ring-1 ring-white/5">
+          <div className="w-full bg-white/[0.07] border border-white/15 rounded-2xl sm:rounded-[40px] overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl ring-1 ring-white/5">
         <div className="flex border-b border-white/10">
           <button
             onClick={() => { setEntryTab('qr'); setError(null); }}
