@@ -44,7 +44,7 @@ import {
 } from '../lib/chatClient';
 import { playMessageSound } from '../lib/messageSound';
 import { APP_NAME } from '../lib/brand';
-import ScannerLandingHero from './ScannerLandingHero';
+import ScannerLandingPage from './ScannerLandingPage';
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-blue-400', bg: 'bg-blue-500/10' },
@@ -523,184 +523,26 @@ export default function ScannerView({ scanCode }: ScannerViewProps) {
       ? countOwnerUnread(landingChatRestore, lastSeenAt ?? loadScannerLastSeen(landingChatRestore.id))
       : 0;
 
-  // Landing — QR scan instructions + vehicle number lookup
+  // Landing — full-page hero + bottom action dock
   if (!scanData && !loading && !scanCode) {
-    const steps = [
-      { icon: QrCode, label: 'Scan QR', desc: 'Point at the sticker' },
-      { icon: HelpCircle, label: 'Pick reason', desc: 'Move, lights, parking…' },
-      { icon: MessageSquare, label: 'Contact', desc: 'Chat or call owner' },
-    ] as const;
-
     return (
-      <>
-        <ScannerLandingHero hidden={showCamera} />
-
-        <div className="relative z-10 flex min-h-[100dvh] flex-col items-center justify-center gap-5 px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(11rem+env(safe-area-inset-top))] sm:gap-6 sm:pt-[calc(12rem+env(safe-area-inset-top))]">
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.65, type: 'spring', stiffness: 100, damping: 22 }}
-            className="w-full max-w-md"
-          >
-            <div className="w-full overflow-hidden rounded-2xl border border-white/20 bg-black/45 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-2xl ring-1 ring-white/10 sm:rounded-[40px]">
-        <div className="flex border-b border-white/10">
-          <button
-            onClick={() => { setEntryTab('qr'); setError(null); }}
-            className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-              entryTab === 'qr' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <QrCode className="w-4 h-4" />
-            Scan QR
-          </button>
-          <button
-            onClick={() => { setEntryTab('plate'); setError(null); }}
-            className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-              entryTab === 'plate' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Car className="w-4 h-4" />
-            Vehicle No.
-          </button>
-        </div>
-
-        <div className="p-5 sm:p-8">
-          {(landingChatRestore || landingChatLoading) && (
-            <div className="mb-6 p-4 rounded-2xl bg-violet-600/15 border border-violet-500/30">
-              {landingChatLoading && !landingChatRestore ? (
-                <div className="flex items-center gap-3 text-violet-100/80 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                  Checking for an open chat…
-                </div>
-              ) : landingChatRestore ? (
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-600/30 flex items-center justify-center shrink-0">
-                      <MessageSquare className="w-5 h-5 text-violet-200" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm text-white">
-                        {landingUnreadCount > 0 ? 'Owner replied' : 'Continue your chat'}
-                      </p>
-                      <p className="text-xs text-violet-100/70 truncate">
-                        {landingChatRestore.vehicleName} · {landingChatRestore.vehicleNumber}
-                      </p>
-                      {landingUnreadCount > 0 && ownerReplyBanner && (
-                        <p className="text-sm text-violet-100/90 mt-1 line-clamp-2">
-                          “{ownerReplyBanner.preview}”
-                        </p>
-                      )}
-                    </div>
-                    {landingUnreadCount > 0 && (
-                      <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-[11px] font-bold flex items-center justify-center shrink-0">
-                        {landingUnreadCount > 9 ? '9+' : landingUnreadCount}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void resumeLandingChat()}
-                    disabled={landingChatLoading}
-                    className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold text-sm flex items-center justify-center gap-2"
-                  >
-                    {landingChatLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
-                    {landingUnreadCount > 0 ? 'Open chat & read reply' : 'Resume chat'}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <AnimatePresence mode="wait">
-            {entryTab === 'qr' ? (
-              <motion.div key="qr" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
-                <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <QrCode className="w-8 h-8 text-blue-400" />
-                </div>
-                <h2 className="text-xl font-semibold mb-2">Scan QR Sticker</h2>
-                <p className="text-white/50 text-sm leading-relaxed mb-6">
-                  Use your camera to scan the sticker, or open the QR link from your phone camera app.
-                </p>
-                <button
-                  onClick={() => setShowCamera(true)}
-                  className="w-full py-4 bg-blue-600 rounded-2xl font-semibold flex items-center justify-center gap-2"
-                >
-                  <Camera className="w-5 h-5" />
-                  Open Camera Scanner
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div key="plate" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <h2 className="text-xl font-semibold mb-2 text-center">Enter Vehicle Number</h2>
-                <p className="text-white/50 text-sm text-center mb-6 leading-relaxed">
-                  QR not visible? Enter the license plate number and we'll check if this vehicle is registered.
-                </p>
-                <input
-                  value={plateInput}
-                  onChange={(e) => setPlateInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => e.key === 'Enter' && loadByPlate(plateInput)}
-                  placeholder="e.g. DL 8C AA 1111"
-                  className="w-full px-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-blue-500/50 font-mono tracking-wider text-center mb-4"
-                />
-                <button
-                  onClick={() => loadByPlate(plateInput)}
-                  disabled={!plateInput.trim()}
-                  className="w-full py-4 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
-                >
-                  <Search className="w-5 h-5" />
-                  Find Vehicle
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {error && (
-            <div className="mt-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-red-300 text-sm font-medium">{error}</p>
-                <p className="text-red-400/60 text-xs mt-1">Only vehicles registered with {APP_NAME} can be contacted.</p>
-              </div>
-            </div>
-          )}
-        </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.45, duration: 0.5 }}
-            className="grid w-full max-w-md grid-cols-3 gap-2 sm:gap-3"
-          >
-            {steps.map(({ icon: Icon, label, desc }) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-white/10 bg-black/35 px-2 py-3 text-center backdrop-blur-md sm:px-3 sm:py-4"
-              >
-                <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 sm:h-10 sm:w-10">
-                  <Icon className="h-4 w-4 text-blue-300 sm:h-5 sm:w-5" />
-                </div>
-                <p className="text-[11px] font-semibold text-white sm:text-xs">{label}</p>
-                <p className="mt-0.5 text-[10px] leading-tight text-white/45 sm:text-[11px]">{desc}</p>
-              </div>
-            ))}
-          </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.55 }}
-            className="text-center text-xs text-white/40"
-          >
-            Vehicle owner? Open Dashboard to manage stickers &amp; chats.
-          </motion.p>
-        </div>
-
-        {showCamera && (
-          <QrCameraScanner onScan={handleCameraScan} onClose={() => setShowCamera(false)} />
-        )}
-      </>
+      <ScannerLandingPage
+        entryTab={entryTab}
+        setEntryTab={setEntryTab}
+        setError={setError}
+        plateInput={plateInput}
+        setPlateInput={setPlateInput}
+        loadByPlate={loadByPlate}
+        error={error}
+        showCamera={showCamera}
+        setShowCamera={setShowCamera}
+        handleCameraScan={handleCameraScan}
+        landingChatRestore={landingChatRestore}
+        landingChatLoading={landingChatLoading}
+        landingUnreadCount={landingUnreadCount}
+        ownerReplyBanner={ownerReplyBanner}
+        resumeLandingChat={resumeLandingChat}
+      />
     );
   }
 
