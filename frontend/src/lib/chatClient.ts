@@ -180,7 +180,7 @@ export function notifyScannerOwnerReply(payload: {
     const notification = new Notification(`${payload.vehicleName} replied`, {
       body,
       tag: `scanner-chat-${payload.sessionId}`,
-      icon: '/brand-logo.png',
+      icon: '/app-icon-192.png',
     });
     notification.onclick = () => {
       window.focus();

@@ -70,6 +70,9 @@ export interface Vehicle {
   theftMode: boolean;
   verified: boolean;
   verifiedAt: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  medicalInfo: string | null;
   stickerCode: string | null;
   stickerTheme: string;
   stickerCustomImage: string | null;
@@ -222,7 +225,14 @@ export const api = {
 
   updateVehicle: (
     vehicleId: string,
-    data: { name?: string; number?: string; active?: boolean }
+    data: {
+      name?: string;
+      number?: string;
+      active?: boolean;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      medicalInfo?: string | null;
+    }
   ) =>
     request<Vehicle>(`/api/vehicles/${vehicleId}`, {
       method: 'PATCH',

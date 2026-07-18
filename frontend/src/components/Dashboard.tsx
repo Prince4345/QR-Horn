@@ -17,6 +17,7 @@ import {
   Pencil,
   ChevronDown,
   FolderLock,
+  HeartPulse,
 } from 'lucide-react';
 import { api, type Vehicle, type Activity } from '../lib/api';
 import { playPingSound } from '../lib/pingSound';
@@ -41,6 +42,9 @@ import { useChat } from '../context/ChatContext';
 import ChatPanel from './ChatPanel';
 import OwnerMessagesView from './OwnerMessagesView';
 import VehicleVault from './VehicleVault';
+import VehicleSafetyInfo from './VehicleSafetyInfo';
+
+type DetailTab = 'overview' | 'messages' | 'vault' | 'emergency' | 'medical';
 
 function getActivityDateGroup(iso: string) {
   const date = new Date(iso);
@@ -265,11 +269,16 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showSticker, setShowSticker] = useState(false);
-  const [detailTab, setDetailTab] = useState<'overview' | 'messages' | 'vault'>(initialTab === 'messages' ? 'messages' : 'overview');
+  const [detailTab, setDetailTab] = useState<DetailTab>(initialTab === 'messages' ? 'messages' : 'overview');
 
-  const setTab = (tab: 'overview' | 'messages' | 'vault') => {
+  const setTab = (tab: DetailTab) => {
     setDetailTab(tab);
     if (tab === 'overview' || tab === 'messages') onTabChange?.(tab);
+  };
+
+  const syncVehicle = (updated: Vehicle) => {
+    setSelectedVehicle(updated);
+    setVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
   };
 
   useEffect(() => {
@@ -749,7 +758,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               <nav className="flex gap-0 px-4 sm:px-6 lg:px-8 border-b border-line bg-surface overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => { setTab('overview'); closeOpenChat(); }}
-                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0 ${
                     detailTab === 'overview' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
                   }`}
                 >
@@ -757,7 +766,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 </button>
                 <button
                   onClick={() => setTab('messages')}
-                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
                     detailTab === 'messages' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
                   }`}
                 >
@@ -769,12 +778,30 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 </button>
                 <button
                   onClick={() => setTab('vault')}
-                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
                     detailTab === 'vault' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
                   }`}
                 >
                   <FolderLock className="w-4 h-4" />
                   Vault
+                </button>
+                <button
+                  onClick={() => setTab('emergency')}
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
+                    detailTab === 'emergency' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
+                  }`}
+                >
+                  <Phone className="w-4 h-4" />
+                  Emergency contact
+                </button>
+                <button
+                  onClick={() => setTab('medical')}
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
+                    detailTab === 'medical' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
+                  }`}
+                >
+                  <HeartPulse className="w-4 h-4" />
+                  Medical info
                 </button>
               </nav>
 
@@ -787,6 +814,18 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                     vehicleVerified={selectedVehicle.verified}
                   />
                 </div>
+              ) : detailTab === 'emergency' ? (
+                <VehicleSafetyInfo
+                  vehicle={selectedVehicle}
+                  mode="emergency"
+                  onSaved={syncVehicle}
+                />
+              ) : detailTab === 'medical' ? (
+                <VehicleSafetyInfo
+                  vehicle={selectedVehicle}
+                  mode="medical"
+                  onSaved={syncVehicle}
+                />
               ) : detailTab === 'messages' ? (
                 <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
                   <div className="lg:w-56 shrink-0 space-y-2 max-h-48 lg:max-h-none overflow-y-auto">

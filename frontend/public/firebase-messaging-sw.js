@@ -23,8 +23,8 @@ function showCallOrAlert(data) {
   const isChat = data.kind === 'chat';
   return self.registration.showNotification(data.title ?? 'ParksTAG', {
     body: data.body ?? 'New vehicle contact',
-    icon: '/brand-logo.png',
-    badge: '/brand-logo.png',
+    icon: '/app-icon-192.png',
+    badge: '/app-icon-192.png',
     tag: isCall ? 'qrhorn-call' : isChat ? 'qrhorn-chat' : 'qrhorn-alert',
     renotify: isCall || isChat,
     requireInteraction: isCall,

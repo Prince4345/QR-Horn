@@ -30,6 +30,9 @@ function mapVehicle(v: {
   theftMode: boolean;
   verified: boolean;
   verifiedAt: Date | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  medicalInfo: string | null;
   sticker: {
     code: string;
     themeId: string;
@@ -53,6 +56,9 @@ function mapVehicle(v: {
     stickerCustomization: parseStickerCustomization(v.sticker?.customization ?? '{}'),
     totalPings: v._count.notifications,
     callsMasked: v._count.calls,
+    emergencyContactName: v.emergencyContactName,
+    emergencyContactPhone: v.emergencyContactPhone,
+    medicalInfo: v.medicalInfo,
   };
 }
 
@@ -314,10 +320,13 @@ router.get('/:id/activity', async (req: AuthRequest, res) => {
 
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
-    const { name, number, active } = req.body as {
+    const { name, number, active, emergencyContactName, emergencyContactPhone, medicalInfo } = req.body as {
       name?: string;
       number?: string;
       active?: boolean;
+      emergencyContactName?: string | null;
+      emergencyContactPhone?: string | null;
+      medicalInfo?: string | null;
     };
 
     const vehicle = await getOwnerVehicle(req.params.id, req.ownerId!);
@@ -354,12 +363,47 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       return;
     }
 
+    if (emergencyContactName !== undefined && emergencyContactName !== null) {
+      if (typeof emergencyContactName !== 'string' || emergencyContactName.trim().length > 120) {
+        res.status(400).json({ error: 'Emergency contact name must be 120 characters or fewer' });
+        return;
+      }
+    }
+
+    if (emergencyContactPhone !== undefined && emergencyContactPhone !== null) {
+      if (typeof emergencyContactPhone !== 'string') {
+        res.status(400).json({ error: 'Emergency contact phone must be a string' });
+        return;
+      }
+      const digits = emergencyContactPhone.replace(/\D/g, '');
+      if (emergencyContactPhone.trim() && (digits.length < 10 || digits.length > 15)) {
+        res.status(400).json({ error: 'Enter a valid emergency contact phone number' });
+        return;
+      }
+    }
+
+    if (medicalInfo !== undefined && medicalInfo !== null) {
+      if (typeof medicalInfo !== 'string' || medicalInfo.length > 2000) {
+        res.status(400).json({ error: 'Medical info must be 2000 characters or fewer' });
+        return;
+      }
+    }
+
     const updated = await prisma.vehicle.update({
       where: { id: vehicle.id },
       data: {
         ...(name !== undefined && { name: name.trim() }),
         ...(numberValue !== undefined && { number: numberValue, numberNormalized }),
         ...(active !== undefined && { active }),
+        ...(emergencyContactName !== undefined && {
+          emergencyContactName: emergencyContactName?.trim() || null,
+        }),
+        ...(emergencyContactPhone !== undefined && {
+          emergencyContactPhone: emergencyContactPhone?.trim() || null,
+        }),
+        ...(medicalInfo !== undefined && {
+          medicalInfo: medicalInfo?.trim() || null,
+        }),
       },
       include: {
         sticker: { select: { code: true, themeId: true, customImageData: true, customization: true } },
