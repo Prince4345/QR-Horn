@@ -94,8 +94,8 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
           // the service worker's showNotification calls too.
           const options = {
             body,
-            icon: '/app-icon-192.png',
-            badge: '/app-icon-192.png',
+            icon: '/app-icon-192.png?v=8',
+            badge: '/app-icon-192.png?v=8',
             tag: 'qrhorn-call',
             renotify: true,
             requireInteraction: true,
@@ -112,7 +112,7 @@ export async function initFirebaseMessaging(config: FirebasePublicConfig): Promi
         } else if (!isCall && Notification.permission === 'granted') {
           // Incoming calls that ARE visible already ring in-app; only
           // non-call alerts get a plain notification while foreground.
-          new Notification(title, { body, icon: '/app-icon-192.png' });
+          new Notification(title, { body, icon: '/app-icon-192.png?v=8' });
         }
         if (isCall) {
           if (data.url) {

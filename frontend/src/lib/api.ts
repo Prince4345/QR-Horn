@@ -72,6 +72,8 @@ export interface Vehicle {
   verifiedAt: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  bloodGroup: string | null;
+  allergies: string | null;
   medicalInfo: string | null;
   stickerCode: string | null;
   stickerTheme: string;
@@ -231,6 +233,8 @@ export const api = {
       active?: boolean;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
+      bloodGroup?: string | null;
+      allergies?: string | null;
       medicalInfo?: string | null;
     }
   ) =>

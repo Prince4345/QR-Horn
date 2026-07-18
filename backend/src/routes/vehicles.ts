@@ -21,6 +21,8 @@ const router = Router();
 
 router.use(requireAuth, requireOwner);
 
+const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+
 function mapVehicle(v: {
   id: string;
   name: string;
@@ -32,6 +34,8 @@ function mapVehicle(v: {
   verifiedAt: Date | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  bloodGroup: string | null;
+  allergies: string | null;
   medicalInfo: string | null;
   sticker: {
     code: string;
@@ -58,6 +62,8 @@ function mapVehicle(v: {
     callsMasked: v._count.calls,
     emergencyContactName: v.emergencyContactName,
     emergencyContactPhone: v.emergencyContactPhone,
+    bloodGroup: v.bloodGroup,
+    allergies: v.allergies,
     medicalInfo: v.medicalInfo,
   };
 }
@@ -320,12 +326,14 @@ router.get('/:id/activity', async (req: AuthRequest, res) => {
 
 router.patch('/:id', async (req: AuthRequest, res) => {
   try {
-    const { name, number, active, emergencyContactName, emergencyContactPhone, medicalInfo } = req.body as {
+    const { name, number, active, emergencyContactName, emergencyContactPhone, bloodGroup, allergies, medicalInfo } = req.body as {
       name?: string;
       number?: string;
       active?: boolean;
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
+      bloodGroup?: string | null;
+      allergies?: string | null;
       medicalInfo?: string | null;
     };
 
@@ -382,6 +390,20 @@ router.patch('/:id', async (req: AuthRequest, res) => {
       }
     }
 
+    if (bloodGroup !== undefined && bloodGroup !== null && bloodGroup !== '') {
+      if (typeof bloodGroup !== 'string' || !BLOOD_GROUPS.includes(bloodGroup as (typeof BLOOD_GROUPS)[number])) {
+        res.status(400).json({ error: 'Select a valid blood group' });
+        return;
+      }
+    }
+
+    if (allergies !== undefined && allergies !== null) {
+      if (typeof allergies !== 'string' || allergies.length > 500) {
+        res.status(400).json({ error: 'Allergies must be 500 characters or fewer' });
+        return;
+      }
+    }
+
     if (medicalInfo !== undefined && medicalInfo !== null) {
       if (typeof medicalInfo !== 'string' || medicalInfo.length > 2000) {
         res.status(400).json({ error: 'Medical info must be 2000 characters or fewer' });
@@ -400,6 +422,12 @@ router.patch('/:id', async (req: AuthRequest, res) => {
         }),
         ...(emergencyContactPhone !== undefined && {
           emergencyContactPhone: emergencyContactPhone?.trim() || null,
+        }),
+        ...(bloodGroup !== undefined && {
+          bloodGroup: bloodGroup?.trim() || null,
+        }),
+        ...(allergies !== undefined && {
+          allergies: allergies?.trim() || null,
         }),
         ...(medicalInfo !== undefined && {
           medicalInfo: medicalInfo?.trim() || null,

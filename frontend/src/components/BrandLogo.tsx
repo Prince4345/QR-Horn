@@ -27,7 +27,7 @@ export default function BrandLogo({ size = 'md', className = '', glow = false }:
       <img
         src={DEFAULT_BRAND_LOGO_URL}
         alt={APP_NAME}
-        className="h-full w-full object-contain"
+        className="h-full w-full scale-[1.02] object-cover"
         draggable={false}
       />
     </span>

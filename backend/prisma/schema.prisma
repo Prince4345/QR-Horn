@@ -46,6 +46,8 @@ model Vehicle {
   verifiedAt       DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?
+  bloodGroup            String?
+  allergies             String?
   medicalInfo           String?            @db.Text
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
