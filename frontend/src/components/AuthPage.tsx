@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
-import { Loader2, Shield, Mail, Lock, User, Phone, Chrome } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone, Chrome } from 'lucide-react';
 import { useAuth, isSupabaseConfigured } from '../context/AuthContext';
 import { APP_NAME } from '../lib/brand';
+import BrandLogo from './BrandLogo';
 
 type AuthMethod = 'email' | 'phone';
 type PhoneStep = 'enter' | 'otp';
@@ -62,9 +63,9 @@ export default function AuthPage() {
 
   if (!isSupabaseConfigured) {
     return (
-      <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center">
+      <div className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center">
         <h2 className="text-xl font-semibold mb-2">Auth Not Configured</h2>
-        <p className="text-white/50 text-sm">
+        <p className="text-muted text-sm">
           Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to frontend/.env
         </p>
       </div>
@@ -74,7 +75,7 @@ export default function AuthPage() {
   if (authLoading || profileLoading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -155,16 +156,14 @@ export default function AuthPage() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl sm:rounded-[40px] p-5 sm:p-8"
+      className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-5 sm:p-8"
     >
       <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Shield className="w-7 h-7 text-blue-400" />
-        </div>
-        <h1 className="text-2xl font-bold mb-1">
+        <BrandLogo size="lg" className="mx-auto mb-4" />
+        <h1 className="font-display text-3xl tracking-[0.12em] text-brand mb-1">
           {needsSetup ? 'Complete your profile' : APP_NAME}
         </h1>
-        <p className="text-white/50 text-sm">
+        <p className="text-muted text-sm">
           {needsSetup
             ? 'We need your name and mobile number to send SMS alerts when someone contacts your vehicle.'
             : 'Owner sign in — manage your vehicle stickers and alerts'}
@@ -172,7 +171,7 @@ export default function AuthPage() {
       </div>
 
       {authError && (
-        <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm text-center">
+        <div className="mb-4 p-3 rounded-xl bg-brand/5 border border-brand/25 text-brand text-sm text-center">
           {authError}
           <button type="button" onClick={clearAuthError} className="block mx-auto mt-2 text-xs underline">
             Dismiss
@@ -183,35 +182,35 @@ export default function AuthPage() {
       {needsSetup ? (
         <form onSubmit={handleSetup} className="space-y-4">
           <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your full name"
               required
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
             />
           </div>
           <div className="relative">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Mobile number (e.g. 9876543210)"
               required
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
             />
           </div>
-          <p className="text-xs text-white/40 text-center leading-relaxed">
+          <p className="text-xs text-faint text-center leading-relaxed">
             Your mobile number is used for SMS alerts when someone scans your QR sticker.
             Push notifications can also be enabled later on your phone.
           </p>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-brand text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading || !name.trim() || !phone.trim()}
-            className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
+            className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & continue'}
           </button>
@@ -222,30 +221,30 @@ export default function AuthPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-3 mb-4 bg-white text-black rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-white/90 transition-colors"
+            className="w-full py-3 mb-4 bg-surface text-ink border border-line rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-soft transition-colors"
           >
             <Chrome className="w-5 h-5" />
             Continue with Google
           </button>
 
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-xs text-white/30 uppercase">or</span>
-            <div className="flex-1 h-px bg-white/10" />
+            <div className="flex-1 h-px bg-soft" />
+            <span className="text-xs text-faint uppercase">or</span>
+            <div className="flex-1 h-px bg-soft" />
           </div>
 
-          <div className="flex mb-4 bg-white/5 rounded-full p-1">
+          <div className="flex mb-4 bg-surface rounded-full p-1">
             <button
               type="button"
               onClick={() => { setAuthMethod('email'); setError(null); setPhoneStep('enter'); }}
-              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'email' ? 'bg-white/10' : 'text-slate-400'}`}
+              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'email' ? 'bg-soft' : 'text-muted'}`}
             >
               <Mail className="w-3.5 h-3.5" /> Email
             </button>
             <button
               type="button"
               onClick={() => { setAuthMethod('phone'); setError(null); setPhoneStep('enter'); }}
-              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'phone' ? 'bg-white/10' : 'text-slate-400'}`}
+              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'phone' ? 'bg-soft' : 'text-muted'}`}
             >
               <Phone className="w-3.5 h-3.5" /> Phone
             </button>
@@ -253,18 +252,18 @@ export default function AuthPage() {
 
           {authMethod === 'email' ? (
             <>
-              <div className="flex mb-4 bg-white/5 rounded-full p-1">
+              <div className="flex mb-4 bg-surface rounded-full p-1">
                 <button
                   type="button"
                   onClick={() => setMode('login')}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'login' ? 'bg-white/10' : 'text-slate-400'}`}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'login' ? 'bg-soft' : 'text-muted'}`}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode('signup')}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'signup' ? 'bg-white/10' : 'text-slate-400'}`}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'signup' ? 'bg-soft' : 'text-muted'}`}
                 >
                   Sign Up
                 </button>
@@ -274,41 +273,41 @@ export default function AuthPage() {
                 {mode === 'signup' && (
                   <>
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Your full name"
                         required
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                       />
                     </div>
                     <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                       <input
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="Mobile number (for SMS alerts)"
                         required
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                       />
                     </div>
                   </>
                 )}
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email"
                     required
-                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                   />
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                   <input
                     type="password"
                     value={password}
@@ -316,15 +315,15 @@ export default function AuthPage() {
                     placeholder="Password"
                     required
                     minLength={6}
-                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                   />
                 </div>
-                {error && <p className="text-red-400 text-sm">{error}</p>}
+                {error && <p className="text-brand text-sm">{error}</p>}
                 {signupMessage && <p className="text-green-400 text-sm">{signupMessage}</p>}
                 <button
                   type="submit"
                   disabled={loading || (mode === 'signup' && (!name.trim() || !phone.trim()))}
-                  className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'signup' ? 'Create Account' : 'Sign In'}
                 </button>
@@ -333,31 +332,31 @@ export default function AuthPage() {
           ) : phoneStep === 'enter' ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Phone number (e.g. 9876543210)"
                   required
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                 />
               </div>
-              <p className="text-xs text-white/40 text-center">
+              <p className="text-xs text-faint text-center">
                 We&apos;ll send a 6-digit OTP. New accounts will be asked for your name next.
               </p>
-              {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && <p className="text-brand text-sm">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || !phone.trim()}
-                className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send OTP'}
               </button>
             </form>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <p className="text-sm text-white/50 text-center">OTP sent to {phone}</p>
+              <p className="text-sm text-muted text-center">OTP sent to {phone}</p>
               <input
                 type="text"
                 inputMode="numeric"
@@ -366,20 +365,20 @@ export default function AuthPage() {
                 placeholder="Enter 6-digit OTP"
                 required
                 maxLength={6}
-                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50 text-center text-2xl tracking-[0.5em] font-mono"
+                className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50 text-center text-2xl tracking-[0.5em] font-mono"
               />
-              {error && <p className="text-red-400 text-sm">{error}</p>}
+              {error && <p className="text-brand text-sm">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full py-3 bg-blue-600 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2"
+                className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & continue'}
               </button>
               <button
                 type="button"
                 onClick={() => { setPhoneStep('enter'); setOtp(''); setError(null); }}
-                className="w-full text-sm text-slate-400 hover:text-white"
+                className="w-full text-sm text-muted hover:text-ink"
               >
                 Change phone number
               </button>

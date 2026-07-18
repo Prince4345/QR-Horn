@@ -7,10 +7,12 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import IncomingCallModal from './components/IncomingCallModal';
 import IncomingChatModal from './components/IncomingChatModal';
 import ViewLoader from './components/ViewLoader';
-import { LayoutDashboard, MessageSquare, QrCode } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Moon, QrCode, Sun } from 'lucide-react';
 import { parseScanCodeFromPath } from './lib/scanUrl';
+import BrandLogo from './components/BrandLogo';
 import { useAuth } from './context/AuthContext';
 import { useChat } from './context/ChatContext';
+import { useTheme } from './context/ThemeContext';
 
 const ScannerView = lazy(() => import('./components/ScannerView'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -32,6 +34,7 @@ function getInitialState() {
 function AppNav() {
   const { owner } = useAuth();
   const { unreadCount } = useChat();
+  const { theme, toggleTheme } = useTheme();
   const initial = getInitialState();
   const [view, setView] = useState<'scanner' | 'dashboard'>(initial.view);
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'messages'>(initial.dashboardTab);
@@ -133,11 +136,12 @@ function AppNav() {
   return (
     <>
       <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-[max(1rem,env(safe-area-inset-top))] px-3">
-        <div className="bg-white/5 border border-white/10 backdrop-blur-md p-1 rounded-full flex gap-0.5 sm:gap-1 pointer-events-auto max-w-full">
+        <div className="bg-surface border border-line shadow-[0_8px_30px_rgba(26,26,26,0.06)] dark:shadow-[0_8px_30px_rgba(255,0,127,0.12)] p-1 rounded-full flex gap-0.5 sm:gap-1 pointer-events-auto max-w-full items-center">
+          <BrandLogo size="sm" className="ml-1.5 mr-0.5 shrink-0" />
           <button
             onClick={openScanner}
-            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
-              view === 'scanner' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
+              view === 'scanner' ? 'bg-brand text-white shadow-md shadow-brand/30' : 'text-muted hover:text-ink'
             }`}
           >
             <QrCode className="w-4 h-4 shrink-0" />
@@ -147,17 +151,17 @@ function AppNav() {
           {owner && (
             <button
               onClick={openMessages}
-              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 relative ${
+              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 relative ${
                 view === 'dashboard' && dashboardTab === 'messages'
-                  ? 'bg-violet-600/30 text-violet-100'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-brand text-white shadow-md shadow-brand/30'
+                  : 'text-muted hover:text-ink'
               }`}
             >
               <MessageSquare className="w-4 h-4 shrink-0" />
               <span className="sm:hidden">Chat</span>
               <span className="hidden sm:inline">Messages</span>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -165,15 +169,24 @@ function AppNav() {
           )}
           <button
             onClick={openDashboard}
-            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
               view === 'dashboard' && dashboardTab !== 'messages'
-                ? 'bg-white/10 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-brand text-white shadow-md shadow-brand/30'
+                : 'text-muted hover:text-ink'
             }`}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" />
             <span className="sm:hidden">Owner</span>
             <span className="hidden sm:inline">Dashboard</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            className="mr-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-soft hover:text-ink sm:h-9 sm:w-9"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4 text-accent" /> : <Moon className="h-4 w-4" />}
           </button>
         </div>
       </div>
@@ -190,7 +203,7 @@ function AppNav() {
         {view === 'scanner' ? (
           <div className="w-full flex flex-col items-stretch">
             <Suspense fallback={<ViewLoader />}>
-              <ScannerView scanCode={scanCode} />
+              <ScannerView scanCode={scanCode} onOpenJoin={openDashboard} />
             </Suspense>
           </div>
         ) : (
@@ -214,7 +227,7 @@ function AppNav() {
 
 export default function App() {
   return (
-    <div className="min-h-dvh bg-[#050505] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative flex flex-col">
+    <div className="min-h-dvh bg-canvas text-ink font-sans selection:bg-brand/15 overflow-x-hidden relative flex flex-col bg-gradient-to-b from-blush/40 via-canvas to-canvas dark:from-blush/80 dark:via-canvas dark:to-canvas">
       <AppNav />
     </div>
   );

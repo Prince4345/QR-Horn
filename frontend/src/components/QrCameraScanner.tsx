@@ -203,12 +203,12 @@ export default function QrCameraScanner({
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 bg-gradient-to-b from-black/80 to-transparent">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-white truncate">{title}</h2>
-          <p className="text-[11px] text-white/50 truncate">{subtitle}</p>
+          <p className="text-[11px] text-white/70 truncate">{subtitle}</p>
         </div>
         <button
           type="button"
           onClick={() => void handleClose()}
-          className="shrink-0 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20"
+          className="shrink-0 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
           aria-label="Close scanner"
         >
           <X className="w-5 h-5" />
@@ -229,14 +229,14 @@ export default function QrCameraScanner({
             <span className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px] border-white rounded-tr-lg" />
             <span className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px] border-white rounded-bl-lg" />
             <span className="absolute bottom-0 right-0 w-10 h-10 border-b-[3px] border-r-[3px] border-white rounded-br-lg" />
-            <div className="absolute inset-x-4 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent qr-scan-line" />
+            <div className="absolute inset-x-4 top-1/2 h-0.5 bg-gradient-to-r from-transparent via-brand to-transparent qr-scan-line" />
           </div>
         </div>
 
         {starting && !error && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70">
-            <Loader2 className="w-10 h-10 animate-spin text-blue-400" />
-            <p className="text-sm text-white/70">Starting camera…</p>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-ink/40">
+            <Loader2 className="w-10 h-10 animate-spin text-brand" />
+            <p className="text-sm text-muted">Starting camera…</p>
           </div>
         )}
 
@@ -249,10 +249,10 @@ export default function QrCameraScanner({
 
       <div className="z-30 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 bg-gradient-to-t from-black/90 to-transparent text-center space-y-2">
         {error ? (
-          <p className="text-red-400 text-sm">{error}</p>
+          <p className="text-brand text-sm">{error}</p>
         ) : (
-          <p className="text-white/70 text-sm flex items-center justify-center gap-2">
-            <Zap className="w-4 h-4 text-blue-400 shrink-0" />
+          <p className="text-muted text-sm flex items-center justify-center gap-2">
+            <Zap className="w-4 h-4 text-brand shrink-0" />
             Auto-scanning — tap screen to refocus
           </p>
         )}

@@ -1,16 +1,16 @@
 {
-  "name": "Qertify",
-  "short_name": "Qertify",
-  "description": "Anonymous vehicle contact via QR — Qertify",
+  "name": "ParksTAG",
+  "short_name": "ParksTAG",
+  "description": "Anonymous vehicle contact via QR — ParksTAG",
   "display": "standalone",
   "start_url": "/",
-  "background_color": "#050505",
-  "theme_color": "#2563eb",
+  "background_color": "#FFF8F0",
+  "theme_color": "#B51F3A",
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/brand-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

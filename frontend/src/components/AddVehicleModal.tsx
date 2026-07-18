@@ -36,7 +36,7 @@ async function readImageFile(file: File): Promise<string> {
 
 function CheckRow({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <div className={`flex items-center gap-2 text-sm ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+    <div className={`flex items-center gap-2 text-sm ${ok ? 'text-emerald-400' : 'text-brand'}`}>
       {ok ? <Check className="w-4 h-4 shrink-0" /> : <X className="w-4 h-4 shrink-0" />}
       <span>{label}</span>
     </div>
@@ -159,13 +159,13 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
   const rcVerified = rcResult?.ok === true;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/40">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6 sm:p-8 relative max-h-[90dvh] overflow-y-auto"
+        className="w-full max-w-md bg-surface border border-line rounded-[32px] p-6 sm:p-8 relative max-h-[90dvh] overflow-y-auto"
       >
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <button onClick={onClose} className="absolute top-4 right-4 text-muted hover:text-ink">
           <X className="w-5 h-5" />
         </button>
 
@@ -173,7 +173,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           <Shield className="w-5 h-5 text-emerald-400" />
           <h2 className="text-xl sm:text-2xl font-bold">Verify & Add Vehicle</h2>
         </div>
-        <p className="text-white/50 text-sm mb-4">
+        <p className="text-muted text-sm mb-4">
           Step {Math.min(step, 3)} of 3 — {stepTitles[step]}
         </p>
 
@@ -181,7 +181,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           {[1, 2, 3].map((s) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full ${step >= s ? 'bg-emerald-500' : 'bg-white/10'}`}
+              className={`h-1 flex-1 rounded-full ${step >= s ? 'bg-emerald-500' : 'bg-soft'}`}
             />
           ))}
         </div>
@@ -189,14 +189,14 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div key="s1" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
-              <p className="text-sm text-white/60 mb-4">
+              <p className="text-sm text-muted mb-4">
                 Upload your RC first. We&apos;ll read it and fetch vehicle details before the plate step.
               </p>
               <input ref={rcInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleRcFile} />
               <button
                 type="button"
                 onClick={() => rcInputRef.current?.click()}
-                className="w-full py-10 rounded-2xl border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 flex flex-col items-center gap-3 transition-colors"
+                className="w-full py-10 rounded-2xl border-2 border-dashed border-line hover:border-emerald-500/50 bg-surface flex flex-col items-center gap-3 transition-colors"
               >
                 {rcPreview ? (
                   <img src={rcPreview} alt="RC preview" className="max-h-40 rounded-lg object-contain" />
@@ -213,7 +213,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                   type="button"
                   disabled={loading}
                   onClick={() => void runRcVerification()}
-                  className="w-full mt-3 py-3 bg-white/10 hover:bg-white/15 disabled:opacity-50 rounded-2xl font-medium flex items-center justify-center gap-2"
+                  className="w-full mt-3 py-3 bg-soft hover:bg-soft disabled:opacity-50 rounded-2xl font-medium flex items-center justify-center gap-2"
                 >
                   {loading ? (
                     <>
@@ -229,22 +229,22 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
               {rcResult && (
                 <div
                   className={`mt-4 rounded-2xl p-4 space-y-2 ${
-                    rcResult.ok
-                      ? 'bg-emerald-500/10 border border-emerald-500/30'
-                      : 'bg-red-500/10 border border-red-500/30'
-                  }`}
+ rcResult.ok
+ ? 'bg-emerald-500/10 border border-emerald-500/30'
+ : 'bg-brand/5 border border-brand/25'
+ }`}
                 >
                   {rcResult.ok ? (
                     <>
-                      <p className="text-sm font-semibold text-emerald-200">Details from RC</p>
+                      <p className="text-sm font-semibold text-emerald-700">Details from RC</p>
                       {rcResult.extracted.rcPlate && (
                         <p className="font-mono text-lg tracking-wider">{rcResult.extracted.rcPlate}</p>
                       )}
                       {rcResult.extracted.ownerNameOnRc && (
-                        <p className="text-xs text-white/60">Owner: {rcResult.extracted.ownerNameOnRc}</p>
+                        <p className="text-xs text-muted">Owner: {rcResult.extracted.ownerNameOnRc}</p>
                       )}
                       {rcResult.extracted.vehicleName && (
-                        <p className="text-xs text-white/60">Vehicle: {rcResult.extracted.vehicleName}</p>
+                        <p className="text-xs text-muted">Vehicle: {rcResult.extracted.vehicleName}</p>
                       )}
                       <CheckRow ok={rcResult.checks.ownerNameMatch} label="RC owner matches your account" />
                       {rcResult.checks.lowConfidenceWarning && (
@@ -255,12 +255,12 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                       )}
                     </>
                   ) : (
-                    <p className="text-red-300 text-sm">{rcResult.message}</p>
+                    <p className="text-brand text-sm">{rcResult.message}</p>
                   )}
                 </div>
               )}
 
-              {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+              {error && <p className="text-brand text-sm mt-3">{error}</p>}
 
               <button
                 type="button"
@@ -276,19 +276,19 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           {step === 2 && (
             <motion.div key="s2" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               {rcResult?.extracted.rcPlate && (
-                <div className="mb-4 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm">
-                  <span className="text-white/50">Plate from RC: </span>
+                <div className="mb-4 rounded-xl bg-surface border border-line px-3 py-2 text-sm">
+                  <span className="text-muted">Plate from RC: </span>
                   <span className="font-mono font-medium">{rcResult.extracted.rcPlate}</span>
                 </div>
               )}
-              <p className="text-sm text-white/60 mb-4">
+              <p className="text-sm text-muted mb-4">
                 Now upload a photo of your number plate. It must match the RC plate above.
               </p>
               <input ref={plateInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePlateFile} />
               <button
                 type="button"
                 onClick={() => plateInputRef.current?.click()}
-                className="w-full py-8 rounded-2xl border-2 border-dashed border-white/20 hover:border-emerald-500/50 bg-white/5 flex flex-col items-center gap-3 mb-4 transition-colors"
+                className="w-full py-8 rounded-2xl border-2 border-dashed border-line hover:border-emerald-500/50 bg-surface flex flex-col items-center gap-3 mb-4 transition-colors"
               >
                 {platePreview ? (
                   <img src={platePreview} alt="Plate preview" className="max-h-32 rounded-lg object-contain" />
@@ -303,14 +303,14 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                 value={typedPlate}
                 onChange={(e) => setTypedPlate(e.target.value.toUpperCase())}
                 placeholder="Confirm plate number (e.g. DL 8C AA 1111)"
-                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-emerald-500/50 font-mono tracking-wider"
+                className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-emerald-500/50 font-mono tracking-wider"
               />
-              {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+              {error && <p className="text-brand text-sm mt-3">{error}</p>}
               <div className="flex gap-2 mt-4">
                 <button
                   type="button"
                   onClick={() => { setError(null); setStep(1); }}
-                  className="px-4 py-3 rounded-2xl bg-white/10 flex items-center gap-1"
+                  className="px-4 py-3 rounded-2xl bg-soft flex items-center gap-1"
                 >
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
@@ -336,7 +336,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
           {step === 3 && plateResult?.ok && (
             <motion.form key="s3" onSubmit={handleSubmit} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
               <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-4 mb-4 space-y-2">
-                <p className="text-sm font-semibold text-emerald-200">All checks passed</p>
+                <p className="text-sm font-semibold text-emerald-700">All checks passed</p>
                 <p className="font-mono text-lg tracking-wider">{plateResult.extracted.rcPlate ?? typedPlate}</p>
                 <CheckRow ok={plateResult.checks.platesMatch} label="RC plate matches plate photo" />
                 <CheckRow ok={plateResult.checks.typedPlateMatch} label="Typed plate matches OCR" />
@@ -354,7 +354,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Vehicle name (e.g. Honda City)"
                 required
-                className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-emerald-500/50 mb-3"
+                className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-emerald-500/50 mb-3"
               />
 
               <div className="flex gap-3 mb-4">
@@ -366,8 +366,8 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                       type="button"
                       onClick={() => setType(t)}
                       className={`flex-1 py-3 rounded-2xl border flex items-center justify-center gap-2 capitalize ${
-                        type === t ? 'bg-emerald-600/20 border-emerald-500/50 text-white' : 'bg-white/5 border-white/10 text-slate-400'
-                      }`}
+ type === t ? 'bg-emerald-600/20 border-emerald-500/50 text-white' : 'bg-surface border-line text-muted'
+ }`}
                     >
                       <Icon className="w-5 h-5" />
                       {t}
@@ -376,13 +376,13 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                 })}
               </div>
 
-              {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+              {error && <p className="text-brand text-sm mb-3">{error}</p>}
 
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => { setError(null); setStep(2); }}
-                  className="px-4 py-3 rounded-2xl bg-white/10 flex items-center gap-1"
+                  className="px-4 py-3 rounded-2xl bg-soft flex items-center gap-1"
                 >
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
@@ -404,7 +404,7 @@ export default function AddVehicleModal({ onClose, onAdded }: AddVehicleModalPro
                 <Check className="w-8 h-8 text-emerald-400" />
               </div>
               <h3 className="text-xl font-bold mb-2">Vehicle verified & added</h3>
-              <p className="text-white/50 text-sm mb-6">
+              <p className="text-muted text-sm mb-6">
                 Your {APP_NAME} QR sticker is ready. Design and print it from the dashboard.
               </p>
               <button type="button" onClick={onClose} className="w-full py-3 bg-emerald-600 rounded-2xl font-semibold">

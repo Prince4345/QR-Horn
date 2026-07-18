@@ -27,6 +27,7 @@ import {
 } from '../lib/stickerExport';
 import { useAuth } from '../context/AuthContext';
 import AuthPage from './AuthPage';
+import BrandLogo from './BrandLogo';
 import AddVehicleModal from './AddVehicleModal';
 import EditVehicleModal from './EditVehicleModal';
 import ProfileModal from './ProfileModal';
@@ -72,20 +73,20 @@ function groupActivitiesByDate(activities: Activity[]) {
 
 function ActivityRow({ act }: { act: Activity }) {
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors">
-      <div className="p-1.5 rounded-full bg-white/5 shrink-0">
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface transition-colors">
+      <div className="p-1.5 rounded-full bg-surface shrink-0">
         {act.type === 'call' ? (
           <Phone className="w-3.5 h-3.5 text-emerald-400" />
         ) : act.type === 'chat' ? (
-          <MessageSquare className="w-3.5 h-3.5 text-violet-400" />
+          <MessageSquare className="w-3.5 h-3.5 text-brand" />
         ) : (
-          <BellRing className="w-3.5 h-3.5 text-blue-400" />
+          <BellRing className="w-3.5 h-3.5 text-brand" />
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-slate-200 truncate">{act.reason}</p>
+        <p className="text-sm text-ink truncate">{act.reason}</p>
       </div>
-      <span className="text-[11px] text-slate-500 shrink-0 tabular-nums">{formatActivityTimeOnly(act.time)}</span>
+      <span className="text-[11px] text-muted shrink-0 tabular-nums">{formatActivityTimeOnly(act.time)}</span>
     </div>
   );
 }
@@ -106,15 +107,15 @@ function ActivityLogGroups({
       {groups.map(({ label, items }) => {
         const expanded = expandedGroups.has(label);
         return (
-          <div key={label} className="rounded-xl border border-white/10 overflow-hidden bg-white/[0.02]">
+          <div key={label} className="rounded-xl border border-line overflow-hidden bg-soft">
             <button
               type="button"
               onClick={() => onToggleGroup(label)}
-              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 transition-colors text-left"
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-surface hover:bg-soft transition-colors text-left"
             >
-              <span className="font-medium text-sm text-slate-200">{label}</span>
-              <span className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
-                <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+              <span className="font-medium text-sm text-ink">{label}</span>
+              <span className="flex items-center gap-2 text-xs text-muted shrink-0">
+                <span className="px-2 py-0.5 rounded-full bg-surface border border-line">
                   {items.length}
                 </span>
                 <ChevronDown
@@ -131,7 +132,7 @@ function ActivityLogGroups({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="py-1 border-t border-white/5 divide-y divide-white/5">
+                  <div className="py-1 border-t border-line divide-y divide-line">
                     {items.map((act) => (
                       <ActivityRow key={act.id} act={act} />
                     ))}
@@ -163,19 +164,19 @@ function PhoneAlertsBanner({
 }) {
   return (
     <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-      <p className="text-amber-200 text-sm font-medium mb-2">Get alerts on your phone</p>
+      <p className="text-amber-800 text-sm font-medium mb-2">Get alerts on your phone</p>
       {isMobile ? (
-        <p className="text-amber-100/70 text-xs mb-3 leading-relaxed">
+        <p className="text-amber-800/80 text-xs mb-3 leading-relaxed">
           Tap below to allow notifications on <strong>this phone</strong>. Alerts are delivered only to devices where you enable them.
         </p>
       ) : (
-        <p className="text-amber-100/70 text-xs mb-3 leading-relaxed">
+        <p className="text-amber-800/80 text-xs mb-3 leading-relaxed">
           Desktop alerts do <strong>not</strong> reach your phone. Open{' '}
-          <span className="font-mono text-amber-100">{window.location.origin}</span> on your phone,
+          <span className="font-mono text-amber-900">{window.location.origin}</span> on your phone,
           sign in, and enable notifications there.
         </p>
       )}
-      <p className="text-amber-100/60 text-xs mb-3 leading-relaxed">
+      <p className="text-amber-800/70 text-xs mb-3 leading-relaxed">
         {hasPhone
           ? 'Alerts can also be sent by SMS to your saved mobile number — even when the app is closed.'
           : 'Add your mobile number in your profile so we can also send SMS alerts when the app is closed.'}
@@ -205,7 +206,7 @@ export default function Dashboard({ isActive = true, openChatSessionId, initialT
   if (profileLoading && !owner && !authError) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -216,8 +217,8 @@ export default function Dashboard({ isActive = true, openChatSessionId, initialT
     if (authError && /backend|timed out|Could not reach|port 3001/i.test(authError)) {
       return (
         <div className="w-full max-w-md text-center py-16 px-6">
-          <p className="text-red-400 mb-4">{authError}</p>
-          <p className="text-white/50 text-sm mb-6">
+          <p className="text-brand mb-4">{authError}</p>
+          <p className="text-muted text-sm mb-6">
             You are signed in, but we could not reach the server. Check that the site is awake and try again.
           </p>
           <button
@@ -225,11 +226,11 @@ export default function Dashboard({ isActive = true, openChatSessionId, initialT
               clearAuthError();
               refreshProfile();
             }}
-            className="px-6 py-3 bg-blue-600 rounded-xl font-semibold mr-3"
+            className="px-6 py-3 bg-brand rounded-xl font-semibold mr-3 text-white"
           >
             Retry
           </button>
-          <button onClick={signOut} className="px-6 py-3 bg-white/10 rounded-xl">
+          <button onClick={signOut} className="px-6 py-3 bg-soft rounded-xl">
             Sign out
           </button>
         </div>
@@ -547,7 +548,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   if (loading && vehicles.length === 0) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -555,8 +556,8 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   if (error && vehicles.length === 0) {
     return (
       <div className="text-center py-20">
-        <p className="text-red-400 mb-4">{error}</p>
-        <button onClick={loadVehicles} className="px-4 py-2 bg-white/10 rounded-xl">Retry</button>
+        <p className="text-brand mb-4">{error}</p>
+        <button onClick={loadVehicles} className="px-4 py-2 bg-soft rounded-xl">Retry</button>
       </div>
     );
   }
@@ -565,8 +566,9 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
     return (
       <>
         <div className="w-full max-w-md text-center py-16">
+          <BrandLogo size="lg" className="mx-auto mb-6" />
           <h2 className="text-2xl font-bold mb-2">Welcome, {owner?.name}</h2>
-          <p className="text-white/50 text-sm mb-8">
+          <p className="text-muted text-sm mb-8">
             Verify your RC and plate to add a vehicle and get a QR sticker.
           </p>
           {!pushEnabled && (
@@ -581,7 +583,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
           )}
           <button
             onClick={() => setShowAddVehicle(true)}
-            className="px-8 py-4 bg-blue-600 rounded-2xl font-semibold flex items-center gap-2 mx-auto"
+            className="px-8 py-4 bg-brand rounded-2xl font-semibold flex items-center gap-2 mx-auto text-white"
           >
             <Plus className="w-5 h-5" /> Add Your First Vehicle
           </button>
@@ -589,17 +591,17 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
             <button
               onClick={handleEnablePush}
               disabled={pushLoading}
-              className="mt-4 px-6 py-3 bg-white/10 rounded-2xl text-sm flex items-center gap-2 mx-auto"
+              className="mt-4 px-6 py-3 bg-soft rounded-2xl text-sm flex items-center gap-2 mx-auto"
             >
               {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
               Enable Push Notifications
             </button>
           )}
           <div className="mt-6 flex items-center justify-center gap-6">
-            <button onClick={() => setShowProfile(true)} className="text-sm text-slate-500 hover:text-white flex items-center gap-1">
+            <button onClick={() => setShowProfile(true)} className="text-sm text-muted hover:text-ink flex items-center gap-1">
               <Pencil className="w-4 h-4" /> Profile
             </button>
-            <button onClick={signOut} className="text-sm text-slate-500 hover:text-white flex items-center gap-1">
+            <button onClick={signOut} className="text-sm text-muted hover:text-ink flex items-center gap-1">
               <LogOut className="w-4 h-4" /> Sign out
             </button>
           </div>
@@ -655,11 +657,11 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   return (
     <>
     {(actionError || error) && vehicles.length > 0 && (
-      <div className="w-full max-w-4xl mb-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start justify-between gap-4">
-        <p className="text-red-300 text-sm">{actionError || error}</p>
+      <div className="w-full max-w-4xl mb-4 p-4 rounded-2xl bg-brand/5 border border-brand/25 flex items-start justify-between gap-4">
+        <p className="text-brand text-sm">{actionError || error}</p>
         <button
           onClick={() => { setActionError(null); setError(null); }}
-          className="text-red-400/70 hover:text-red-300 text-xs shrink-0"
+          className="text-brand/70 hover:text-brand text-xs shrink-0"
         >
           Dismiss
         </button>
@@ -680,15 +682,15 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className={`w-full grid grid-cols-1 md:grid-cols-12 gap-6 transition-[max-width] ${
-        showSticker ? 'max-w-6xl' : 'max-w-4xl'
-      }`}
+ showSticker ? 'max-w-6xl' : 'max-w-4xl'
+ }`}
     >
       <div className={`md:col-span-5 flex-col gap-6 ${showSticker ? 'hidden' : 'flex'}`}>
-        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl sm:rounded-[40px] p-5 sm:p-8 flex-1 flex flex-col">
+        <div className="bg-surface border border-line rounded-3xl sm:rounded-[40px] p-5 sm:p-8 flex-1 flex flex-col">
           <div className="flex flex-wrap justify-between items-start gap-3 mb-6 sm:mb-8">
             <div>
               <h2 className="text-2xl sm:text-3xl font-light mb-1">Active Vehicles</h2>
-              <p className="text-white/40 text-sm italic">{vehicles.length} Vehicles Protected</p>
+              <p className="text-faint text-sm italic">{vehicles.length} Vehicles Protected</p>
             </div>
             <button
               onClick={() => setShowAddVehicle(true)}
@@ -704,22 +706,22 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 key={vehicle.id}
                 onClick={() => { setSelectedVehicle(vehicle); setShowSticker(false); }}
                 className={`p-4 sm:p-5 rounded-3xl border flex items-center gap-4 sm:gap-6 transition-colors cursor-pointer text-left ${
-                  selectedVehicle.id === vehicle.id ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
-                }`}
+ selectedVehicle.id === vehicle.id ? 'bg-soft border-line' : 'bg-surface border-line hover:bg-soft'
+ }`}
               >
-                <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center shrink-0">
-                  {vehicle.type === 'car' ? <Car className="w-8 h-8 text-blue-400" /> : <Bike className="w-8 h-8 text-blue-400" />}
+                <div className="w-16 h-16 bg-soft rounded-2xl flex items-center justify-center shrink-0">
+                  {vehicle.type === 'car' ? <Car className="w-8 h-8 text-brand" /> : <Bike className="w-8 h-8 text-brand" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-lg font-semibold truncate">
                     {vehicle.name}{' '}
-                    <span className="text-white/30 text-xs ml-2 uppercase tracking-widest">{vehicle.number}</span>
+                    <span className="text-faint text-xs ml-2 uppercase tracking-widest">{vehicle.number}</span>
                   </h3>
-                  <p className="text-sm text-white/50 truncate">Status: {vehicle.active ? 'Protected' : 'Inactive'}</p>
+                  <p className="text-sm text-muted truncate">Status: {vehicle.active ? 'Protected' : 'Inactive'}</p>
                 </div>
                 <div className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center uppercase tracking-wider shrink-0 ${
-                  vehicle.active ? 'bg-blue-500/20 text-blue-400' : 'bg-white/10 text-white/40'
-                }`}>
+ vehicle.active ? 'bg-brand/10 text-brand' : 'bg-soft text-faint'
+ }`}>
                   {vehicle.active ? 'Live' : 'Off'}
                 </div>
               </button>
@@ -735,7 +737,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 <h4 className="text-orange-400 font-bold text-sm uppercase tracking-wider">Theft Mode</h4>
                 <p className="text-xs text-orange-200/60">Priority push/SMS alerts when someone contacts this vehicle.</p>
               </div>
-              <div className={`w-12 h-6 rounded-full relative shrink-0 transition-colors ${selectedVehicle.theftMode ? 'bg-orange-500' : 'bg-white/10'}`}>
+              <div className={`w-12 h-6 rounded-full relative shrink-0 transition-colors ${selectedVehicle.theftMode ? 'bg-orange-500' : 'bg-soft'}`}>
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${selectedVehicle.theftMode ? 'left-7' : 'left-1'}`} />
               </div>
             </button>
@@ -743,32 +745,32 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
         </div>
       </div>
 
-      <div className={`bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] p-4 sm:p-8 min-h-0 sm:min-h-[500px] ${
-        showSticker ? 'md:col-span-12' : 'md:col-span-7'
-      }`}>
+      <div className={`bg-surface border border-line rounded-3xl sm:rounded-[40px] p-4 sm:p-8 min-h-0 sm:min-h-[500px] ${
+ showSticker ? 'md:col-span-12' : 'md:col-span-7'
+ }`}>
         <AnimatePresence mode="wait">
           {!showSticker ? (
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
               <div className="flex gap-2 mb-6">
                 <button
                   onClick={() => { setTab('overview'); closeOpenChat(); }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium ${detailTab === 'overview' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium ${detailTab === 'overview' ? 'bg-brand text-white' : 'text-muted hover:text-ink'}`}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setTab('messages')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'messages' ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'messages' ? 'bg-brand text-white' : 'text-muted hover:text-ink'}`}
                 >
                   <MessageSquare className="w-4 h-4" />
                   Messages
                   {sessions.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-blue-600 text-[10px] font-bold">{sessions.length}</span>
+                    <span className="px-1.5 py-0.5 rounded-full bg-brand text-[10px] font-bold text-white">{sessions.length}</span>
                   )}
                 </button>
                 <button
                   onClick={() => setTab('vault')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'vault' ? 'bg-violet-600/25 text-violet-100' : 'text-slate-400 hover:text-white'}`}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'vault' ? 'bg-brand/10 text-brand' : 'text-muted hover:text-ink'}`}
                 >
                   <FolderLock className="w-4 h-4" />
                   Vault
@@ -786,20 +788,20 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
                   <div className="lg:w-56 shrink-0 space-y-2 max-h-48 lg:max-h-none overflow-y-auto">
                     {sessions.length === 0 ? (
-                      <p className="text-slate-500 text-sm">No active chats.</p>
+                      <p className="text-muted text-sm">No active chats.</p>
                     ) : (
                       sessions.map((s) => (
                         <button
                           key={s.id}
                           onClick={() => void openChat(s.id, { navigate: false })}
                           className={`w-full text-left p-3 rounded-xl border transition-colors ${
-                            openSessionId === s.id ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/5 hover:bg-white/10'
-                          }`}
+ openSessionId === s.id ? 'bg-soft border-line' : 'bg-surface border-line hover:bg-soft'
+ }`}
                         >
                           <p className="text-sm font-medium truncate">{s.vehicleName}</p>
-                          <p className="text-[10px] font-mono text-slate-500 truncate">{s.vehicleNumber}</p>
+                          <p className="text-[10px] font-mono text-muted truncate">{s.vehicleNumber}</p>
                           {s.lastMessage && (
-                            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{s.lastMessage.body}</p>
+                            <p className="text-xs text-muted mt-1 line-clamp-2">{s.lastMessage.body}</p>
                           )}
                           {s.readOnly && (
                             <span className="text-[10px] text-amber-400 uppercase mt-1 inline-block">Read-only</span>
@@ -808,7 +810,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                       ))
                     )}
                   </div>
-                  <div className="flex-1 min-h-[360px] bg-white/5 rounded-2xl p-4 border border-white/5">
+                  <div className="flex-1 min-h-[360px] bg-surface rounded-2xl p-4 border border-line">
                     {openSessionId ? (
                       <ChatPanel
                         session={activeSession}
@@ -818,7 +820,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                         onBlock={() => blockSession(openSessionId)}
                       />
                     ) : (
-                      <p className="text-slate-500 text-sm text-center py-12">Select a conversation to reply.</p>
+                      <p className="text-muted text-sm text-center py-12">Select a conversation to reply.</p>
                     )}
                   </div>
                 </div>
@@ -828,7 +830,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">{selectedVehicle.name}</h1>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-3 py-1 rounded-md bg-white/10 font-mono text-sm tracking-widest text-slate-300">{selectedVehicle.number}</span>
+                    <span className="px-3 py-1 rounded-md bg-soft font-mono text-sm tracking-widest text-muted">{selectedVehicle.number}</span>
                     {selectedVehicle.verified && (
                       <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-semibold text-emerald-300 uppercase tracking-wider">
                         RC verified
@@ -840,7 +842,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setShowEditVehicle(true)}
-                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1"
+                      className="px-3 py-2 rounded-xl bg-soft hover:bg-soft text-sm flex items-center gap-1"
                       title="Edit vehicle"
                     >
                       <Pencil className="w-4 h-4" />
@@ -849,7 +851,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                       <button
                         onClick={handleEnablePush}
                         disabled={pushLoading}
-                        className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-1"
+                        className="px-3 py-2 rounded-xl bg-soft hover:bg-soft text-sm flex items-center gap-1"
                         title="Enable push notifications"
                       >
                         {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
@@ -857,10 +859,10 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                     )}
                     <button
                       onClick={() => setShowProfile(true)}
-                      className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm flex items-center gap-2"
+                      className="px-3 py-2 rounded-xl bg-soft hover:bg-soft text-sm flex items-center gap-2"
                       title="Your profile"
                     >
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-[9px] font-bold">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-[9px] font-bold text-white">
                         {(owner?.name ?? '?')
                           .trim()
                           .split(/\s+/)
@@ -870,7 +872,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                       </span>
                       Profile
                     </button>
-                    <button onClick={() => setShowSticker(true)} className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors flex items-center gap-2">
+                    <button onClick={() => setShowSticker(true)} className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white font-medium transition-colors flex items-center gap-2">
                       <QrCode className="w-4 h-4" /> Get Sticker
                     </button>
                   </div>
@@ -881,26 +883,26 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <div className="p-4 rounded-2xl bg-surface border border-line">
                   <div className="flex items-center gap-2 mb-2">
-                    <BellRing className="w-4 h-4 text-slate-400" />
-                    <h3 className="font-medium text-slate-300">Total Pings</h3>
+                    <BellRing className="w-4 h-4 text-muted" />
+                    <h3 className="font-medium text-muted">Total Pings</h3>
                   </div>
-                  <p className="text-3xl font-display font-bold text-white">{selectedVehicle.totalPings}</p>
+                  <p className="text-3xl font-display font-bold text-ink">{selectedVehicle.totalPings}</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/5">
+                <div className="p-4 rounded-2xl bg-surface border border-line">
                   <div className="flex items-center gap-2 mb-2">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <h3 className="font-medium text-slate-300">Voice Calls</h3>
+                    <Phone className="w-4 h-4 text-muted" />
+                    <h3 className="font-medium text-muted">Voice Calls</h3>
                   </div>
-                  <p className="text-3xl font-display font-bold text-white">{selectedVehicle.callsMasked}</p>
+                  <p className="text-3xl font-display font-bold text-ink">{selectedVehicle.callsMasked}</p>
                 </div>
               </div>
 
-              <h3 className="text-lg font-medium text-slate-200 mb-4">Recent Activity</h3>
+              <h3 className="text-lg font-medium text-ink mb-4">Recent Activity</h3>
               <div className="flex-grow">
                 {activities.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No activity yet.</p>
+                  <p className="text-muted text-sm">No activity yet.</p>
                 ) : (
                   <ActivityLogGroups
                     activities={activities}
@@ -938,14 +940,14 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                           'noopener,noreferrer'
                         )
                       }
-                      className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      className="text-sm text-brand hover:text-brand flex items-center gap-1"
                     >
                       <ExternalLink className="w-4 h-4" /> Open public scan page
                     </button>
                     <button
                       onClick={handleDownloadPng}
                       disabled={downloading || printing}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium transition-colors flex items-center gap-2"
+                      className="px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-50 text-white font-medium transition-colors flex items-center gap-2"
                     >
                       {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       Download PNG
@@ -953,7 +955,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                     <button
                       onClick={handlePrintPdf}
                       disabled={downloading || printing}
-                      className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white font-medium transition-colors flex items-center gap-2"
+                      className="px-5 py-2.5 rounded-xl bg-soft hover:bg-soft disabled:opacity-50 text-ink font-medium transition-colors flex items-center gap-2"
                     >
                       {printing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                       Print PDF
@@ -961,7 +963,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                   </div>
                 </>
               ) : (
-                <p className="text-slate-400 text-sm text-center py-12">No sticker code yet.</p>
+                <p className="text-muted text-sm text-center py-12">No sticker code yet.</p>
               )}
             </motion.div>
           )}

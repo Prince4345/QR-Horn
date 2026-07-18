@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { AuthProvider } from './context/AuthContext';
 import { CallProvider } from './context/CallContext';
 import { ChatProvider } from './context/ChatContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { initRingtoneUnlock } from './lib/ringtone';
 import { initMessageSoundUnlock } from './lib/messageSound';
 import App from './App.tsx';
@@ -13,12 +14,14 @@ initMessageSoundUnlock();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <CallProvider>
-        <ChatProvider>
-          <App />
-        </ChatProvider>
-      </CallProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CallProvider>
+          <ChatProvider>
+            <App />
+          </ChatProvider>
+        </CallProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

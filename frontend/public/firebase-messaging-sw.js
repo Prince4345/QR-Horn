@@ -21,8 +21,10 @@ const messaging = firebase.messaging();
 function showCallOrAlert(data) {
   const isCall = data.kind === 'call';
   const isChat = data.kind === 'chat';
-  return self.registration.showNotification(data.title ?? 'Qertify', {
+  return self.registration.showNotification(data.title ?? 'ParksTAG', {
     body: data.body ?? 'New vehicle contact',
+    icon: '/brand-logo.png',
+    badge: '/brand-logo.png',
     tag: isCall ? 'qrhorn-call' : isChat ? 'qrhorn-chat' : 'qrhorn-alert',
     renotify: isCall || isChat,
     requireInteraction: isCall,

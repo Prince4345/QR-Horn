@@ -4,6 +4,7 @@ import { prisma } from './prisma.js';
 import { normalizePlate } from './plates.js';
 import { normalizePersonName, scoreNameMatch, OWNER_NAME_MATCH_THRESHOLD } from './nameMatch.js';
 import { extractRcDocument, extractPlatePhoto } from './vehicleDocExtractor.js';
+import { APP_NAME } from './brand.js';
 
 export const VERIFICATION_TTL_MS = 15 * 60 * 1000;
 export const CONFIDENCE_BLOCK = 0.6;
@@ -223,7 +224,7 @@ export async function verifyRcDocument(
 
   const existingPlate = await prisma.vehicle.findFirst({ where: { numberNormalized: rcNormalized } });
   if (existingPlate) {
-    return rcFailure('plate_taken', 'This plate is already registered on Qertify.', extracted, checks);
+    return rcFailure('plate_taken', `This plate is already registered on ${APP_NAME}.`, extracted, checks);
   }
 
   const rcFingerprint = buildRcFingerprint(rcNormalized, extraction.ownerName, extraction.chassisLast4);
@@ -402,7 +403,7 @@ export async function verifyPlatePhoto(
 
   const existingPlate = await prisma.vehicle.findFirst({ where: { numberNormalized: rcNormalized } });
   if (existingPlate) {
-    return plateFailure('plate_taken', 'This plate is already registered on Qertify.', extracted, checks);
+    return plateFailure('plate_taken', `This plate is already registered on ${APP_NAME}.`, extracted, checks);
   }
 
   const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
@@ -461,7 +462,7 @@ export async function consumeVerification(
     where: { numberNormalized: verification.plateNormalized },
   });
   if (existingPlate) {
-    return { error: 'This plate is already registered on Qertify.' as const };
+    return { error: `This plate is already registered on ${APP_NAME}.` as const };
   }
 
   return { verification };

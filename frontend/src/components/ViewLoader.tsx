@@ -1,9 +1,11 @@
 import { Loader2 } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 
 export default function ViewLoader() {
   return (
-    <div className="flex items-center justify-center py-24">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+    <div className="flex flex-col items-center justify-center gap-4 py-24">
+      <BrandLogo size="lg" className="opacity-90" />
+      <Loader2 className="w-8 h-8 animate-spin text-brand" />
     </div>
   );
 }

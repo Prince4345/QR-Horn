@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { renderArtisticQr } from '../lib/artisticQr';
 import { renderFramedQr } from '../lib/qrFrames';
 import { getArtPreset, type QrArtStyle } from '../lib/qrArtStyles';
-import { getScanUrl } from '../lib/scanUrl';
+import { BRAND_LOGO_LETTER } from '../lib/brand';
 
 interface StickerQRCodeProps {
   code: string;
@@ -25,7 +25,7 @@ export default function StickerQRCode({
   darkColor = '#0f172a',
   lightColor = '#ffffff',
   imageDataUrl = null,
-  logoText = 'Q',
+  logoText = BRAND_LOGO_LETTER,
   logoImageDataUrl = null,
   withFrame = true,
 }: StickerQRCodeProps) {

@@ -116,31 +116,31 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/40" onClick={onClose}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] relative overflow-hidden max-h-[90vh] overflow-y-auto custom-scroll"
+        className="w-full max-w-md bg-surface border border-line rounded-[32px] relative overflow-hidden max-h-[90vh] overflow-y-auto custom-scroll"
       >
         {/* Header with gradient + avatar */}
-        <div className="relative px-8 pt-10 pb-6 bg-gradient-to-br from-blue-600/30 via-indigo-600/20 to-transparent">
+        <div className="relative px-8 pt-10 pb-6 bg-gradient-to-br from-brand/20 via-brand/10 to-transparent">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/20 text-slate-300 hover:text-white hover:bg-black/40 transition-colors"
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/20 text-muted hover:text-ink hover:bg-black/40 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-2xl font-bold shadow-lg shadow-blue-500/20 shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-brand/20 shrink-0">
               {initials(owner.name) || <User className="w-7 h-7" />}
             </div>
             <div className="min-w-0">
               <h2 className="text-2xl font-bold truncate">{owner.name}</h2>
-              <p className="text-white/50 text-sm truncate">{owner.email}</p>
+              <p className="text-muted text-sm truncate">{owner.email}</p>
               {joined && (
-                <p className="text-white/30 text-xs mt-0.5 flex items-center gap-1">
+                <p className="text-faint text-xs mt-0.5 flex items-center gap-1">
                   <Calendar className="w-3 h-3" /> Member since {joined}
                 </p>
               )}
@@ -156,13 +156,13 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
           )}
 
           {/* Personal details */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <div className="rounded-2xl border border-line bg-soft p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wider">Personal details</h3>
+              <h3 className="text-sm font-semibold text-ink uppercase tracking-wider">Personal details</h3>
               {!editing && (
                 <button
                   onClick={() => setEditing(true)}
-                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                  className="text-xs text-brand hover:text-brand flex items-center gap-1"
                 >
                   <Pencil className="w-3 h-3" /> Edit
                 </button>
@@ -172,36 +172,36 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             {editing ? (
               <form onSubmit={handleSave} className="space-y-3">
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Full name</label>
+                  <label className="text-xs text-faint mb-1 block">Full name</label>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
                     required
                     maxLength={80}
-                    className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50"
+                    className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-white/40 mb-1 block">Mobile number</label>
+                  <label className="text-xs text-faint mb-1 block">Mobile number</label>
                   <input
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 98765 43210"
                     required
                     inputMode="tel"
-                    className="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 outline-none focus:border-blue-500/50 font-mono"
+                    className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50 font-mono"
                   />
-                  <p className="text-[11px] text-white/30 mt-1">SMS alerts about your vehicle are sent to this number.</p>
+                  <p className="text-[11px] text-faint mt-1">SMS alerts about your vehicle are sent to this number.</p>
                 </div>
 
-                {error && <p className="text-red-400 text-sm">{error}</p>}
+                {error && <p className="text-brand text-sm">{error}</p>}
 
                 <div className="flex gap-2 pt-1">
                   <button
                     type="submit"
                     disabled={saving || !name.trim() || !phone.trim()}
-                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="flex-1 py-3 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors text-white"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     Save
@@ -210,7 +210,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     type="button"
                     onClick={handleCancelEdit}
                     disabled={saving}
-                    className="px-5 py-3 bg-white/10 hover:bg-white/15 rounded-2xl text-sm transition-colors"
+                    className="px-5 py-3 bg-soft hover:bg-soft rounded-2xl text-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -219,23 +219,23 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white/5"><User className="w-4 h-4 text-blue-400" /></div>
+                  <div className="p-2 rounded-xl bg-surface"><User className="w-4 h-4 text-brand" /></div>
                   <div className="min-w-0">
-                    <p className="text-xs text-white/40">Full name</p>
+                    <p className="text-xs text-faint">Full name</p>
                     <p className="text-sm font-medium truncate">{owner.name}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white/5"><Phone className="w-4 h-4 text-emerald-400" /></div>
+                  <div className="p-2 rounded-xl bg-surface"><Phone className="w-4 h-4 text-emerald-400" /></div>
                   <div className="min-w-0">
-                    <p className="text-xs text-white/40">Mobile number</p>
+                    <p className="text-xs text-faint">Mobile number</p>
                     <p className="text-sm font-medium font-mono truncate">{owner.phone || 'Not set'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-white/5"><Mail className="w-4 h-4 text-amber-400" /></div>
+                  <div className="p-2 rounded-xl bg-surface"><Mail className="w-4 h-4 text-amber-400" /></div>
                   <div className="min-w-0">
-                    <p className="text-xs text-white/40">Email</p>
+                    <p className="text-xs text-faint">Email</p>
                     <p className="text-sm font-medium truncate">{owner.email}</p>
                   </div>
                 </div>
@@ -244,18 +244,18 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
           </div>
 
           {/* Notifications */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wider mb-4">Notifications</h3>
+          <div className="rounded-2xl border border-line bg-soft p-5">
+            <h3 className="text-sm font-semibold text-ink uppercase tracking-wider mb-4">Notifications</h3>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`p-2 rounded-xl ${pushEnabled ? 'bg-emerald-500/10' : 'bg-white/5'}`}>
+                <div className={`p-2 rounded-xl ${pushEnabled ? 'bg-emerald-500/10' : 'bg-surface'}`}>
                   {pushEnabled
                     ? <BellRing className="w-4 h-4 text-emerald-400" />
-                    : <Bell className="w-4 h-4 text-white/40" />}
+                    : <Bell className="w-4 h-4 text-faint" />}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium">Push alerts on this device</p>
-                  <p className="text-xs text-white/40">
+                  <p className="text-xs text-faint">
                     {pushEnabled ? 'Enabled — you will get instant alerts here.' : 'Off — enable to get instant alerts.'}
                   </p>
                 </div>
@@ -268,7 +268,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                 <button
                   onClick={handleEnablePush}
                   disabled={pushLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0 transition-colors"
+                  className="px-4 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0 transition-colors text-white"
                 >
                   {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
                   Enable
@@ -279,29 +279,29 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
               <button
                 onClick={handleTestPush}
                 disabled={testLoading}
-                className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2.5 rounded-xl bg-soft hover:bg-soft disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
               >
                 {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
                 Send test notification
               </button>
               {testResult && (
-                <p className="text-xs text-white/50 mt-2 text-center leading-relaxed">{testResult}</p>
+                <p className="text-xs text-muted mt-2 text-center leading-relaxed">{testResult}</p>
               )}
             </div>
-            <div className="mt-4 flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/5">
-              <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-white/40 leading-relaxed">
+            <div className="mt-4 flex items-start gap-3 p-3 rounded-xl bg-soft border border-line">
+              <ShieldCheck className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+              <p className="text-xs text-faint leading-relaxed">
                 Your phone number stays private. Scanners contact you through anonymous in-app calls and alerts — they never see your details.
               </p>
             </div>
           </div>
 
-          {!editing && error && <p className="text-red-400 text-sm">{error}</p>}
+          {!editing && error && <p className="text-brand text-sm">{error}</p>}
 
           {/* Sign out */}
           <button
             onClick={signOut}
-            className="w-full py-3 bg-red-600/15 border border-red-500/25 text-red-300 hover:bg-red-600/25 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-3 bg-red-600/15 border border-red-500/25 text-brand hover:bg-red-600/25 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>

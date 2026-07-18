@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { BRAND_LOGO_LETTER } from './brand';
 import { getArtPreset, type ArtStylePreset, type QrArtStyle } from './qrArtStyles';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -162,7 +163,7 @@ async function drawCenterLogo(
   ctx.font = `700 ${letterHalf * 1.15}px system-ui, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText((logoText || 'Q').charAt(0).toUpperCase(), cx, cx + letterHalf * 0.05);
+  ctx.fillText((logoText || BRAND_LOGO_LETTER).charAt(0).toUpperCase(), cx, cx + letterHalf * 0.05);
 }
 
 async function renderPhotoQr(
@@ -241,7 +242,7 @@ async function renderPhotoQr(
     drawFinderEye(ctx, (e.c + margin) * cell, (e.r + margin) * cell, cell, darkFallback, lightFallback, shape);
   }
 
-  await drawCenterLogo(ctx, size, darkFallback, logoText ?? 'Q', logoImageDataUrl);
+  await drawCenterLogo(ctx, size, darkFallback, logoText ?? BRAND_LOGO_LETTER, logoImageDataUrl);
 
   return canvas.toDataURL('image/png');
 }
@@ -362,7 +363,7 @@ export async function renderArtisticQr(options: {
     preset,
     dark,
     light,
-    logoText ?? 'Q',
+    logoText ?? BRAND_LOGO_LETTER,
     moduleOverride,
     bgOverride,
     logoImageDataUrl

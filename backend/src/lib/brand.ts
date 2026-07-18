@@ -1,1 +1,1 @@
-export const APP_NAME = 'Qertify';
+export const APP_NAME = 'ParksTAG';
