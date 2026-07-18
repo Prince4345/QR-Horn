@@ -13,8 +13,7 @@ import {
   Video,
   XCircle,
 } from 'lucide-react';
-import { APP_NAME, APP_NAME_MARK } from '../lib/brand';
-import BrandLogo from './BrandLogo';
+import { APP_NAME } from '../lib/brand';
 import type { ChatSession } from '../lib/chatClient';
 import { useAuth } from '../context/AuthContext';
 import ScannerLandingHero from './ScannerLandingHero';
@@ -113,18 +112,24 @@ export default function ScannerLandingPage({
       <ScannerLandingHero hidden={showCamera} />
 
       <div className="relative z-10 w-full">
-        {/* —— Top: brand + scan card (above everything) —— */}
-        <section className="relative px-4 pt-[calc(5rem+env(safe-area-inset-top))] pb-8 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-3xl">
+        {/* —— Website hero: headline + scan tools —— */}
+        <section className="relative bg-canvas/80">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16">
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4 }}
-              className="mb-6 flex items-center justify-center gap-3"
+              className="mb-8 max-w-2xl"
             >
-              <BrandLogo size="md" />
-              <p className="font-display text-xl tracking-[0.18em] text-brand sm:text-2xl">
-                {APP_NAME_MARK}
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand mb-3">
+                {APP_NAME}
+              </p>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight text-ink">
+                Reach a vehicle owner —{' '}
+                <span className="text-brand">without sharing numbers.</span>
+              </h1>
+              <p className="mt-4 text-sm sm:text-base leading-relaxed text-muted max-w-xl">
+                Scan a {APP_NAME} sticker or enter a plate number. Chat or call privately in seconds.
               </p>
             </motion.div>
 
@@ -132,10 +137,11 @@ export default function ScannerLandingPage({
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05, duration: 0.45 }}
-              className="overflow-hidden rounded-[24px] border border-line bg-surface shadow-[0_16px_40px_rgba(26,26,26,0.06)] dark:shadow-[0_16px_40px_rgba(255,0,127,0.1)]"
+              className="overflow-hidden rounded-3xl bg-surface shadow-[0_8px_32px_rgba(26,26,26,0.08)] dark:shadow-[0_8px_32px_rgba(255,0,127,0.12)]"
+              id="scan"
             >
               {(landingChatRestore || landingChatLoading) && (
-                <div className="border-b border-line px-4 py-3 sm:px-5">
+                <div className="px-4 py-3 sm:px-5">
                   {landingChatLoading && !landingChatRestore ? (
                     <div className="flex items-center gap-2 text-sm text-muted">
                       <Loader2 className="h-4 w-4 animate-spin text-brand" />
@@ -177,16 +183,17 @@ export default function ScannerLandingPage({
                 </div>
               )}
 
-              <div className="flex border-b border-line">
+              <div className="px-4 pt-2 sm:px-5 sm:pt-3">
+                <div className="flex gap-1 rounded-2xl bg-soft p-1">
                 <button
                   type="button"
                   onClick={() => {
                     setEntryTab('qr');
                     setError(null);
                   }}
-                  className={`flex flex-1 items-center justify-center gap-2 py-3.5 text-sm font-semibold transition-colors ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
                     entryTab === 'qr'
-                      ? 'border-b-2 border-b-brand bg-blush text-brand'
+                      ? 'bg-surface text-brand shadow-sm'
                       : 'text-muted hover:text-ink'
                   }`}
                 >
@@ -199,15 +206,16 @@ export default function ScannerLandingPage({
                     setEntryTab('plate');
                     setError(null);
                   }}
-                  className={`flex flex-1 items-center justify-center gap-2 border-l border-line py-3.5 text-sm font-semibold transition-colors ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${
                     entryTab === 'plate'
-                      ? 'border-b-2 border-b-brand bg-blush text-brand'
+                      ? 'bg-surface text-brand shadow-sm'
                       : 'text-muted hover:text-ink'
                   }`}
                 >
                   <Car className="h-4 w-4" />
                   Plate number
                 </button>
+                </div>
               </div>
 
               <div className="p-5 sm:p-6">
@@ -231,7 +239,7 @@ export default function ScannerLandingPage({
                       <button
                         type="button"
                         onClick={() => setShowCamera(true)}
-                        className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white hover:bg-brand-dark sm:min-w-[180px]"
+                        className="flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white hover:bg-brand-dark sm:min-w-[180px]"
                       >
                         <Camera className="h-4 w-4" />
                         Open scanner
@@ -256,7 +264,7 @@ export default function ScannerLandingPage({
                         type="button"
                         onClick={() => loadByPlate(plateInput)}
                         disabled={!plateInput.trim()}
-                        className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-45 sm:min-w-[140px]"
+                        className="flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-brand px-6 py-3 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-45 sm:min-w-[140px]"
                       >
                         <Search className="h-4 w-4" />
                         Find
@@ -275,45 +283,18 @@ export default function ScannerLandingPage({
             </motion.div>
 
             {!isOwnerLoggedIn && (
-              <p className="mt-4 text-center text-xs text-faint">
+              <p className="mt-5 text-sm text-muted">
                 Vehicle owner?{' '}
                 <button
                   type="button"
                   onClick={onOpenJoin}
-                  className="font-medium text-brand underline-offset-2 hover:underline"
+                  className="font-semibold text-brand underline-offset-2 hover:underline"
                 >
-                  Join or sign in
+                  Sign in
                 </button>{' '}
                 to manage stickers &amp; messages.
               </p>
             )}
-          </div>
-        </section>
-
-        {/* —— Hero copy —— */}
-        <section className="relative px-4 pb-12 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-4xl text-center">
-            <h1 className="text-3xl font-bold leading-tight tracking-tight text-ink sm:text-5xl">
-              Your Vehicle, Your Privacy,{' '}
-              <span className="text-brand">Simplified.</span>
-            </h1>
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted sm:text-base">
-              Stick a {APP_NAME} QR on your car. Anyone can reach you — without seeing your phone number.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href="#how-it-works"
-                className="rounded-full bg-brand px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-brand/20 hover:bg-brand-dark"
-              >
-                View Details
-              </a>
-              <a
-                href="#about"
-                className="rounded-full border border-brand/30 bg-surface px-7 py-3 text-sm font-semibold text-brand hover:bg-blush"
-              >
-                About {APP_NAME}
-              </a>
-            </div>
           </div>
         </section>
 

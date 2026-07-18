@@ -4,6 +4,7 @@ import { Loader2, Mail, Lock, User, Phone, Chrome } from 'lucide-react';
 import { useAuth, isSupabaseConfigured } from '../context/AuthContext';
 import { APP_NAME } from '../lib/brand';
 import BrandLogo from './BrandLogo';
+import BrandWordmark from './BrandWordmark';
 
 type AuthMethod = 'email' | 'phone';
 type PhoneStep = 'enter' | 'otp';
@@ -159,10 +160,12 @@ export default function AuthPage() {
       className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-5 sm:p-8"
     >
       <div className="text-center mb-8">
-        <BrandLogo size="lg" className="mx-auto mb-4" />
-        <h1 className="font-display text-3xl tracking-[0.12em] text-brand mb-1">
-          {needsSetup ? 'Complete your profile' : APP_NAME}
-        </h1>
+        <BrandLogo size="lg" glow className="mx-auto mb-4" />
+        {needsSetup ? (
+          <h1 className="text-2xl font-bold text-ink mb-1">Complete your profile</h1>
+        ) : (
+          <BrandWordmark size="lg" className="justify-center mb-1 inline-flex" />
+        )}
         <p className="text-muted text-sm">
           {needsSetup
             ? 'We need your name and mobile number to send SMS alerts when someone contacts your vehicle.'

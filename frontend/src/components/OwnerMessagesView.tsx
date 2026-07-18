@@ -1,4 +1,4 @@
-import { ArrowLeft, Car } from 'lucide-react';
+import { ArrowLeft, UserRound } from 'lucide-react';
 import ChatPanel from './ChatPanel';
 import type { ChatSession } from '../lib/chatClient';
 import type { api } from '../lib/api';
@@ -15,6 +15,12 @@ type OwnerMessagesViewProps = {
   onSend: (body: string, isQuickReply?: boolean) => Promise<void>;
   onBlock: () => Promise<void>;
 };
+
+function contactLabel(s: SessionSummary | ChatSession | undefined): string {
+  if (!s) return 'Anonymous';
+  const name = 'scannerName' in s ? s.scannerName : null;
+  return name?.trim() || 'Anonymous';
+}
 
 function ConversationList({
   sessions,
@@ -40,16 +46,16 @@ function ConversationList({
           <button
             type="button"
             onClick={() => onSelectChat(s.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-surface active:bg-soft transition-colors ${
- openSessionId === s.id ? 'bg-soft' : ''
- }`}
+            className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
+              openSessionId === s.id ? 'bg-soft border-l-2 border-l-brand' : 'hover:bg-soft/60 border-l-2 border-l-transparent'
+            }`}
           >
             <div className="w-11 h-11 rounded-full bg-brand/10 border border-brand/25 flex items-center justify-center shrink-0">
-              <Car className="w-5 h-5 text-brand" />
+              <UserRound className="w-5 h-5 text-brand" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="font-medium text-sm truncate">{s.vehicleName}</p>
+                <p className="font-medium text-sm truncate">{contactLabel(s)}</p>
                 {s.lastMessage && (
                   <span className="text-[10px] text-muted shrink-0">
                     {new Date(s.lastMessage.createdAt).toLocaleTimeString([], {
@@ -59,7 +65,9 @@ function ConversationList({
                   </span>
                 )}
               </div>
-              <p className="text-[10px] font-mono text-muted truncate">{s.vehicleNumber}</p>
+              <p className="text-[10px] text-muted truncate">
+                {s.vehicleName} · {s.vehicleNumber}
+              </p>
               {s.lastMessage && (
                 <p className="text-xs text-muted mt-0.5 truncate">{s.lastMessage.body}</p>
               )}
@@ -86,18 +94,18 @@ export default function OwnerMessagesView({
 }: OwnerMessagesViewProps) {
   const activeSummary = sessions.find((s) => s.id === openSessionId);
   const showMobileChat = !!openSessionId;
+  const headerName = contactLabel(activeSession ?? activeSummary);
 
   return (
-    <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row h-[calc(100dvh-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] bg-soft/80 lg:bg-surface lg:border lg:border-line lg:rounded-3xl overflow-hidden">
-      {/* Conversation list — full screen on mobile when no chat; sidebar on desktop */}
-      <div
-        className={`flex flex-col min-h-0 bg-surface lg:bg-transparent lg:w-80 xl:w-96 shrink-0 border-b lg:border-b-0 lg:border-r border-line ${
- showMobileChat ? 'hidden lg:flex' : 'flex flex-1 lg:flex-none'
- }`}
+    <div className="w-full flex flex-col lg:flex-row h-[calc(100dvh-3.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:h-[calc(100dvh-4rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] border-t border-line bg-canvas">
+      <aside
+        className={`flex flex-col min-h-0 lg:w-80 xl:w-96 shrink-0 border-b lg:border-b-0 lg:border-r border-line bg-surface ${
+          showMobileChat ? 'hidden lg:flex' : 'flex flex-1 lg:flex-none'
+        }`}
       >
-        <div className="px-4 py-3 border-b border-line shrink-0">
-          <h1 className="text-lg font-semibold">Messages</h1>
-          <p className="text-xs text-muted">Tap a conversation to reply</p>
+        <div className="px-5 py-4 border-b border-line shrink-0">
+          <h1 className="text-xl font-semibold tracking-tight">Messages</h1>
+          <p className="text-xs text-muted mt-0.5">Conversations from vehicle scans</p>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-none min-h-0">
           <ConversationList
@@ -106,35 +114,34 @@ export default function OwnerMessagesView({
             onSelectChat={onSelectChat}
           />
         </div>
-      </div>
+      </aside>
 
-      {/* Chat pane */}
-      <div
-        className={`flex flex-col min-h-0 flex-1 min-w-0 ${
- showMobileChat ? 'flex' : 'hidden lg:flex'
- }`}
+      <section
+        className={`flex flex-col min-h-0 flex-1 min-w-0 bg-canvas ${
+          showMobileChat ? 'flex' : 'hidden lg:flex'
+        }`}
       >
         {openSessionId ? (
           <>
-            <div className="flex items-center gap-3 px-3 py-2.5 border-b border-line shrink-0 bg-surface lg:bg-transparent lg:backdrop-blur-none">
+            <header className="flex items-center gap-3 px-4 py-3 border-b border-line shrink-0 bg-surface">
               <button
                 type="button"
                 onClick={onBack}
-                className="p-2 -ml-1 rounded-full hover:bg-soft text-ink lg:hidden"
+                className="p-2 -ml-1 rounded-lg hover:bg-soft text-ink lg:hidden"
                 aria-label="Back to conversations"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-sm truncate">
-                  {activeSession?.vehicleName ?? activeSummary?.vehicleName ?? 'Chat'}
-                </p>
-                <p className="text-[10px] font-mono text-muted truncate">
+                <p className="font-semibold text-sm truncate">{headerName}</p>
+                <p className="text-[10px] text-muted truncate">
+                  {(activeSession?.vehicleName ?? activeSummary?.vehicleName) || 'Vehicle'}
+                  {' · '}
                   {activeSession?.vehicleNumber ?? activeSummary?.vehicleNumber}
                 </p>
               </div>
-            </div>
-            <div className="flex-1 min-h-0 px-2 lg:px-4 pb-2">
+            </header>
+            <div className="flex-1 min-h-0 px-3 lg:px-6 pb-3 pt-2 max-w-3xl w-full mx-auto">
               <ChatPanel
                 session={activeSession}
                 loading={loadingSession}
@@ -146,11 +153,12 @@ export default function OwnerMessagesView({
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted text-sm px-6 text-center">
-            Select a conversation from the list to start chatting.
+          <div className="flex-1 flex flex-col items-center justify-center text-muted text-sm px-6 text-center gap-2">
+            <UserRound className="w-10 h-10 text-faint" />
+            <p>Select a conversation to reply</p>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

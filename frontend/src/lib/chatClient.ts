@@ -6,6 +6,7 @@ export type ChatMessage = {
   body: string;
   isQuickReply: boolean;
   createdAt: string;
+  readAt: string | null;
 };
 
 export type ChatSession = {
@@ -13,6 +14,8 @@ export type ChatSession = {
   vehicleId: string;
   vehicleName: string;
   vehicleNumber: string;
+  ownerName: string;
+  scannerName: string | null;
   status: 'ACTIVE' | 'READ_ONLY' | 'CLOSED' | 'BLOCKED';
   callRoomId: string | null;
   canSend: boolean;
@@ -29,11 +32,18 @@ export type ChatSessionSummary = {
   vehicleId: string;
   vehicleName: string;
   vehicleNumber: string;
+  ownerName?: string;
+  scannerName?: string | null;
   status: string;
   callRoomId: string | null;
   readOnly: boolean;
   updatedAt: string;
-  lastMessage: { body: string; senderRole: string; createdAt: string } | null;
+  lastMessage: {
+    body: string;
+    senderRole: string;
+    createdAt: string;
+    readAt?: string | null;
+  } | null;
 };
 
 export type IncomingChat = {

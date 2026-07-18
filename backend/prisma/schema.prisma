@@ -196,6 +196,8 @@ model ChatSession {
   vehicleId     String
   ownerId       String
   scannerToken  String
+  /// Display name when the scanner is a registered ParksTAG user; null = Anonymous
+  scannerName   String?
   callRoomId    String?
   reason        ContactReason?
   status        ChatSessionStatus @default(ACTIVE)
@@ -220,6 +222,7 @@ model ChatMessage {
   senderRole   ChatSenderRole
   body         String
   isQuickReply Boolean        @default(false)
+  readAt       DateTime?
   createdAt    DateTime       @default(now())
   session      ChatSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 

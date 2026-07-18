@@ -7,9 +7,11 @@ import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import IncomingCallModal from './components/IncomingCallModal';
 import IncomingChatModal from './components/IncomingChatModal';
 import ViewLoader from './components/ViewLoader';
-import { LayoutDashboard, MessageSquare, Moon, QrCode, Sun } from 'lucide-react';
+import { LayoutDashboard, LogIn, MessageSquare, Moon, QrCode, Sun } from 'lucide-react';
 import { parseScanCodeFromPath } from './lib/scanUrl';
+import { APP_NAME } from './lib/brand';
 import BrandLogo from './components/BrandLogo';
+import BrandWordmark from './components/BrandWordmark';
 import { useAuth } from './context/AuthContext';
 import { useChat } from './context/ChatContext';
 import { useTheme } from './context/ThemeContext';
@@ -32,9 +34,10 @@ function getInitialState() {
 }
 
 function AppNav() {
-  const { owner } = useAuth();
+  const { owner, session, setupComplete } = useAuth();
   const { unreadCount } = useChat();
   const { theme, toggleTheme } = useTheme();
+  const isLoggedIn = Boolean(session && setupComplete && owner);
   const initial = getInitialState();
   const [view, setView] = useState<'scanner' | 'dashboard'>(initial.view);
   const [dashboardTab, setDashboardTab] = useState<'overview' | 'messages'>(initial.dashboardTab);
@@ -133,81 +136,102 @@ function AppNav() {
     window.history.pushState(null, '', '/?view=dashboard&tab=messages');
   };
 
+  const openSignIn = () => {
+    openDashboard();
+  };
+
+  const navLink = (active: boolean) =>
+    `px-3 py-2 text-sm font-medium transition-colors ${
+      active ? 'text-brand' : 'text-muted hover:text-ink'
+    }`;
+
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-50 flex justify-center pointer-events-none pt-[max(1rem,env(safe-area-inset-top))] px-3">
-        <div className="bg-surface border border-line shadow-[0_8px_30px_rgba(26,26,26,0.06)] dark:shadow-[0_8px_30px_rgba(255,0,127,0.12)] p-1 rounded-full flex gap-0.5 sm:gap-1 pointer-events-auto max-w-full items-center">
-          <BrandLogo size="sm" className="ml-1.5 mr-0.5 shrink-0" />
-          <button
-            onClick={openScanner}
-            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
-              view === 'scanner' ? 'bg-brand text-white shadow-md shadow-brand/30' : 'text-muted hover:text-ink'
-            }`}
-          >
-            <QrCode className="w-4 h-4 shrink-0" />
-            <span className="sm:hidden">Scan</span>
-            <span className="hidden sm:inline">Scanner</span>
-          </button>
-          {owner && (
-            <button
-              onClick={openMessages}
-              className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 relative ${
-                view === 'dashboard' && dashboardTab === 'messages'
-                  ? 'bg-brand text-white shadow-md shadow-brand/30'
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              <span className="sm:hidden">Chat</span>
-              <span className="hidden sm:inline">Messages</span>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-          )}
-          <button
-            onClick={openDashboard}
-            className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold uppercase tracking-wide flex items-center gap-1.5 sm:gap-2 transition-colors shrink-0 ${
-              view === 'dashboard' && dashboardTab !== 'messages'
-                ? 'bg-brand text-white shadow-md shadow-brand/30'
-                : 'text-muted hover:text-ink'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4 shrink-0" />
-            <span className="sm:hidden">Owner</span>
-            <span className="hidden sm:inline">Dashboard</span>
-          </button>
+      <header className="sticky top-0 z-50 w-full bg-surface/95 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-16 sm:h-[4.5rem] max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <button
             type="button"
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-            className="mr-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-soft hover:text-ink sm:h-9 sm:w-9"
+            onClick={openScanner}
+            className="flex min-w-0 items-center gap-2.5 sm:gap-3 group"
+            aria-label={`${APP_NAME} home`}
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4 text-accent" /> : <Moon className="h-4 w-4" />}
+            <BrandLogo size="nav" glow className="transition-transform group-hover:scale-[1.02]" />
+            <BrandWordmark size="sm" className="group-hover:opacity-90 transition-opacity text-[1.5rem] sm:text-[1.875rem]" />
           </button>
+
+          <nav className="flex items-center gap-0.5 sm:gap-1">
+            <button type="button" onClick={openScanner} className={navLink(view === 'scanner')}>
+              <span className="inline-flex items-center gap-1.5">
+                <QrCode className="h-4 w-4" />
+                <span className="hidden sm:inline">Scan</span>
+              </span>
+            </button>
+
+            {isLoggedIn ? (
+              <>
+                <button
+                  type="button"
+                  onClick={openMessages}
+                  className={`${navLink(view === 'dashboard' && dashboardTab === 'messages')} relative`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="hidden sm:inline">Messages</span>
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={openDashboard}
+                  className={navLink(view === 'dashboard' && dashboardTab !== 'messages')}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span className="hidden sm:inline">Dashboard</span>
+                  </span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={openSignIn}
+                className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-md shadow-brand/25 hover:bg-brand-dark transition-colors"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign in
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-soft hover:text-ink"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4 text-accent" /> : <Moon className="h-4 w-4" />}
+            </button>
+          </nav>
         </div>
-      </div>
+      </header>
 
       <main
-        className={`relative z-10 pb-[calc(1rem+env(safe-area-inset-bottom))] min-h-dvh flex flex-col w-full ${
-          view === 'scanner'
-            ? 'px-0 items-stretch pt-0'
-            : view === 'dashboard' && dashboardTab === 'messages'
-              ? 'px-0 sm:px-4 items-stretch pt-[calc(4.5rem+env(safe-area-inset-top))]'
-              : 'px-2 sm:px-4 items-center pt-[calc(4.5rem+env(safe-area-inset-top))]'
+        className={`relative z-10 pb-[calc(1rem+env(safe-area-inset-bottom))] min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-4.5rem)] flex flex-col w-full ${
+          view === 'scanner' ? 'px-0 items-stretch' : 'px-0 items-stretch'
         }`}
       >
         {view === 'scanner' ? (
           <div className="w-full flex flex-col items-stretch">
             <Suspense fallback={<ViewLoader />}>
-              <ScannerView scanCode={scanCode} onOpenJoin={openDashboard} />
+              <ScannerView scanCode={scanCode} onOpenJoin={openSignIn} />
             </Suspense>
           </div>
         ) : (
-          <div className="w-full flex flex-col items-center">
+          <div className="w-full flex flex-col items-stretch">
             <Suspense fallback={<ViewLoader />}>
               <Dashboard
                 isActive={view === 'dashboard'}

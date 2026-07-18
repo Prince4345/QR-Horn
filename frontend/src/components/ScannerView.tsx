@@ -46,6 +46,25 @@ import { playMessageSound } from '../lib/messageSound';
 import { APP_NAME } from '../lib/brand';
 import BrandLogo from './BrandLogo';
 import ScannerLandingPage from './ScannerLandingPage';
+import PlateLookupLoading from './PlateLookupLoading';
+
+const PLATE_REVEAL_CONTAINER = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.11, delayChildren: 0.06 },
+  },
+} as const;
+
+const PLATE_REVEAL_ITEM = {
+  hidden: { opacity: 0, y: 14, filter: 'blur(6px)' },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const },
+  },
+} as const;
 
 const REASONS: { id: ContactReason; label: string; icon: typeof Car; color: string; bg: string }[] = [
   { id: 'move', label: 'Move Vehicle', icon: Car, color: 'text-brand', bg: 'bg-brand/10' },
@@ -550,6 +569,10 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
   }
 
   if (loading) {
+    if (contactMethod === 'plate' && contactId) {
+      return <PlateLookupLoading plate={contactId} />;
+    }
+
     return (
       <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))]">
       <motion.div
@@ -558,9 +581,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
         className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-8 sm:p-12 flex flex-col items-center"
       >
         <Loader2 className="w-8 h-8 animate-spin text-brand mb-4" />
-        <p className="text-muted text-sm">
-          {contactMethod === 'plate' ? 'Checking registration...' : 'Loading vehicle...'}
-        </p>
+        <p className="text-muted text-sm">Loading vehicle...</p>
       </motion.div>
       </div>
     );
@@ -623,11 +644,43 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
             </span>
           </div>
         ) : !isChatFullscreen ? (
+        contactMethod === 'plate' ? (
+        <motion.div
+          className="text-center mb-8"
+          variants={PLATE_REVEAL_CONTAINER}
+          initial="hidden"
+          animate="show"
+        >
+          <motion.div variants={PLATE_REVEAL_ITEM} className="w-12 h-1 bg-soft rounded-full mx-auto mb-4" />
+          <motion.p variants={PLATE_REVEAL_ITEM} className="text-faint text-xs tracking-widest uppercase mb-1">
+            Vehicle Found
+          </motion.p>
+          <motion.h1 variants={PLATE_REVEAL_ITEM} className="text-2xl font-semibold mb-2">
+            {scanData.vehicleName}
+          </motion.h1>
+          <motion.span
+            variants={PLATE_REVEAL_ITEM}
+            className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm tracking-widest text-muted mb-3"
+          >
+            {scanData.vehicleNumber}
+          </motion.span>
+          <motion.p variants={PLATE_REVEAL_ITEM} className="text-muted text-sm mb-4">
+            Contacting vehicle owner anonymously
+          </motion.p>
+          <motion.div
+            variants={PLATE_REVEAL_ITEM}
+            className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full"
+          >
+            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+            <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">
+              Registered · Privacy Mask Active
+            </span>
+          </motion.div>
+        </motion.div>
+        ) : (
         <div className="text-center mb-8">
           <div className="w-12 h-1 bg-soft rounded-full mx-auto mb-4" />
-          <p className="text-faint text-xs tracking-widest uppercase mb-1">
-            {contactMethod === 'plate' ? 'Vehicle Found' : 'Scanned Vehicle'}
-          </p>
+          <p className="text-faint text-xs tracking-widest uppercase mb-1">Scanned Vehicle</p>
           <h1 className="text-2xl font-semibold mb-2">{scanData.vehicleName}</h1>
           <span className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm tracking-widest text-muted mb-3">
             {scanData.vehicleNumber}
@@ -640,6 +693,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
             </span>
           </div>
         </div>
+        )
         ) : (
           <div className="flex items-center gap-3 pb-3 mb-2 border-b border-line shrink-0">
             <button
@@ -660,7 +714,14 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
         <div className={`${status === 'calling' || isChatFullscreen ? 'flex-1 flex flex-col min-h-0' : ''}`}>
           <AnimatePresence mode="wait">
             {status === 'idle' && (
-              <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col gap-6">
+              <motion.div
+                key="idle"
+                initial={{ opacity: 0, y: contactMethod === 'plate' ? 10 : 0 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: contactMethod === 'plate' ? 0.5 : 0, duration: 0.35 }}
+                className="flex flex-col gap-6"
+              >
                 {chatOpen && chatSession ? (
                   <div className="flex flex-col flex-1 min-h-0">
                     <div className="flex-1 min-h-0 rounded-2xl bg-surface border border-line p-2 md:p-4">

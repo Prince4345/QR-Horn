@@ -51,3 +51,25 @@ export async function requireOwner(req: AuthRequest, res: Response, next: NextFu
   }
   next();
 }
+
+/** Best-effort auth — never fails the request. Sets ownerId when Bearer token is valid. */
+export async function tryAttachOwner(req: AuthRequest): Promise<{ ownerId: string; name: string } | null> {
+  try {
+    if (!supabaseAdmin) return null;
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) return null;
+    const token = header.slice(7);
+    const { data, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !data.user) return null;
+    const owner = await prisma.owner.findUnique({
+      where: { authUserId: data.user.id },
+      select: { id: true, name: true },
+    });
+    if (!owner) return null;
+    req.authUserId = data.user.id;
+    req.ownerId = owner.id;
+    return { ownerId: owner.id, name: owner.name };
+  } catch {
+    return null;
+  }
+}

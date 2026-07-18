@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { ContactReason } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { requireAuth, type AuthRequest } from '../lib/auth.js';
+import { requireAuth, tryAttachOwner, type AuthRequest } from '../lib/auth.js';
 import {
   appendChatMessage,
   ensureChatSession,
-  formatSessionDto,
   getSessionDtoForRole,
   refreshSessionLifecycle,
 } from '../lib/chatSessions.js';
@@ -23,41 +22,41 @@ function clientIp(req: { ip?: string; headers: Record<string, unknown> }): strin
   return req.ip || 'unknown';
 }
 
+const sessionInclude = {
+  vehicle: {
+    select: {
+      id: true,
+      name: true,
+      number: true,
+      owner: { select: { name: true } },
+    },
+  },
+  messages: { orderBy: { createdAt: 'asc' as const } },
+};
+
 async function getOwnerSession(sessionId: string, ownerId: string) {
   const session = await prisma.chatSession.findFirst({
     where: { id: sessionId, ownerId },
-    include: {
-      vehicle: { select: { id: true, name: true, number: true } },
-      messages: { orderBy: { createdAt: 'asc' } },
-    },
+    include: sessionInclude,
   });
   if (!session) return null;
   const refreshed = await refreshSessionLifecycle(session);
   return prisma.chatSession.findFirst({
     where: { id: refreshed.id, ownerId },
-    include: {
-      vehicle: { select: { id: true, name: true, number: true } },
-      messages: { orderBy: { createdAt: 'asc' } },
-    },
+    include: sessionInclude,
   });
 }
 
 async function getScannerSession(sessionId: string, scannerToken: string) {
   const session = await prisma.chatSession.findFirst({
     where: { id: sessionId, scannerToken },
-    include: {
-      vehicle: { select: { id: true, name: true, number: true } },
-      messages: { orderBy: { createdAt: 'asc' } },
-    },
+    include: sessionInclude,
   });
   if (!session) return null;
   const refreshed = await refreshSessionLifecycle(session);
   return prisma.chatSession.findFirst({
     where: { id: refreshed.id, scannerToken },
-    include: {
-      vehicle: { select: { id: true, name: true, number: true } },
-      messages: { orderBy: { createdAt: 'asc' } },
-    },
+    include: sessionInclude,
   });
 }
 
@@ -74,7 +73,14 @@ router.get('/sessions', requireAuth, async (req: AuthRequest, res) => {
         status: { in: ['ACTIVE', 'READ_ONLY'] },
       },
       include: {
-        vehicle: { select: { id: true, name: true, number: true } },
+        vehicle: {
+          select: {
+            id: true,
+            name: true,
+            number: true,
+            owner: { select: { name: true } },
+          },
+        },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { updatedAt: 'desc' },
@@ -93,12 +99,19 @@ router.get('/sessions', requireAuth, async (req: AuthRequest, res) => {
         vehicleId: full.vehicleId,
         vehicleName: full.vehicle.name,
         vehicleNumber: full.vehicle.number,
+        ownerName: full.vehicle.owner.name,
+        scannerName: full.scannerName?.trim() || null,
         status: full.status,
         callRoomId: full.callRoomId,
         readOnly: full.status === 'READ_ONLY',
         updatedAt: full.updatedAt.toISOString(),
         lastMessage: last
-          ? { body: last.body, senderRole: last.senderRole, createdAt: last.createdAt.toISOString() }
+          ? {
+              body: last.body,
+              senderRole: last.senderRole,
+              createdAt: last.createdAt.toISOString(),
+              readAt: last.readAt?.toISOString() ?? null,
+            }
           : null,
       });
     }
@@ -116,11 +129,6 @@ router.get('/sessions/:sessionId', requireAuth, async (req: AuthRequest, res) =>
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const dto = await getSessionDtoForRole(req.params.sessionId, 'owner');
-    if (!dto) {
-      res.status(404).json({ error: 'Chat session not found' });
-      return;
-    }
     const owned = await prisma.chatSession.findFirst({
       where: { id: req.params.sessionId, ownerId: req.ownerId },
     });
@@ -128,6 +136,13 @@ router.get('/sessions/:sessionId', requireAuth, async (req: AuthRequest, res) =>
       res.status(404).json({ error: 'Chat session not found' });
       return;
     }
+    const dto = await getSessionDtoForRole(req.params.sessionId, 'owner', { markRead: true });
+    if (!dto) {
+      res.status(404).json({ error: 'Chat session not found' });
+      return;
+    }
+    // Let the scanner see double-ticks when the owner opens the thread
+    emitChatSessionUpdate(req.ownerId, dto);
     res.json(dto);
   } catch (error) {
     console.error('GET /api/chat/sessions/:sessionId:', error);
@@ -259,7 +274,13 @@ router.get('/scanner/:sessionId', async (req, res) => {
       return;
     }
 
-    res.json(formatSessionDto(session, 'scanner'));
+    const dto = await getSessionDtoForRole(req.params.sessionId, 'scanner', { markRead: true });
+    if (!dto) {
+      res.status(404).json({ error: 'Chat session not found' });
+      return;
+    }
+    emitChatSessionUpdate(session.ownerId, dto);
+    res.json(dto);
   } catch (error) {
     console.error('GET /api/chat/scanner/:sessionId:', error);
     res.status(500).json({ error: 'Failed to load chat' });
@@ -354,6 +375,11 @@ router.post('/start/:vehicleId', async (req, res) => {
     const validReasons: ContactReason[] = ['move', 'lights', 'parking', 'emergency', 'other'];
     const chatReason = reason && validReasons.includes(reason) ? reason : null;
 
+    const registered = await tryAttachOwner(req as AuthRequest);
+    // Don't label the vehicle owner as the scanner if they message their own car
+    const scannerName =
+      registered && registered.ownerId !== vehicle.ownerId ? registered.name : null;
+
     let created;
     try {
       created = await ensureChatSession({
@@ -362,6 +388,7 @@ router.post('/start/:vehicleId', async (req, res) => {
         callRoomId: callRoomId ?? null,
         reason: chatReason,
         scannerToken,
+        scannerName,
       });
     } catch (err) {
       if (err instanceof Error && err.message === 'blocked') {

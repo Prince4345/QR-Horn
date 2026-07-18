@@ -656,111 +656,110 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
 
   return (
     <>
-    {(actionError || error) && vehicles.length > 0 && (
-      <div className="w-full max-w-4xl mb-4 p-4 rounded-2xl bg-brand/5 border border-brand/25 flex items-start justify-between gap-4">
-        <p className="text-brand text-sm">{actionError || error}</p>
-        <button
-          onClick={() => { setActionError(null); setError(null); }}
-          className="text-brand/70 hover:text-brand text-xs shrink-0"
-        >
-          Dismiss
-        </button>
-      </div>
-    )}
-    {!pushEnabled && (
-      <div className="w-full max-w-4xl mb-4">
-        <PhoneAlertsBanner
-          onEnable={handleEnablePush}
-          pushLoading={pushLoading}
-          isMobile={isMobile}
-          hasPhone={!!owner?.phone}
-        />
-      </div>
-    )}
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className={`w-full grid grid-cols-1 md:grid-cols-12 gap-6 transition-[max-width] ${
- showSticker ? 'max-w-6xl' : 'max-w-4xl'
- }`}
+      exit={{ opacity: 0, y: -12 }}
+      className="w-full min-h-[calc(100dvh-4.5rem)] border-t border-line"
     >
-      <div className={`md:col-span-5 flex-col gap-6 ${showSticker ? 'hidden' : 'flex'}`}>
-        <div className="bg-surface border border-line rounded-3xl sm:rounded-[40px] p-5 sm:p-8 flex-1 flex flex-col">
-          <div className="flex flex-wrap justify-between items-start gap-3 mb-6 sm:mb-8">
+      {(actionError || error) && vehicles.length > 0 && (
+        <div className="w-full px-4 sm:px-6 lg:px-10 py-3 bg-brand/5 border-b border-brand/25 flex items-start justify-between gap-4">
+          <p className="text-brand text-sm">{actionError || error}</p>
+          <button
+            onClick={() => { setActionError(null); setError(null); }}
+            className="text-brand/70 hover:text-brand text-xs shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      {!pushEnabled && (
+        <div className="w-full px-4 sm:px-6 lg:px-10 py-3 border-b border-line bg-surface">
+          <PhoneAlertsBanner
+            onEnable={handleEnablePush}
+            pushLoading={pushLoading}
+            isMobile={isMobile}
+            hasPhone={!!owner?.phone}
+          />
+        </div>
+      )}
+
+      <div className={`w-full grid grid-cols-1 lg:grid-cols-12 ${showSticker ? '' : 'lg:min-h-[calc(100dvh-4.5rem)]'}`}>
+      <aside className={`lg:col-span-4 xl:col-span-3 flex-col border-b lg:border-b-0 lg:border-r border-line bg-surface ${showSticker ? 'hidden' : 'flex'}`}>
+          <div className="px-5 sm:px-6 py-5 flex flex-wrap justify-between items-start gap-3 border-b border-line">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-light mb-1">Active Vehicles</h2>
-              <p className="text-faint text-sm italic">{vehicles.length} Vehicles Protected</p>
+              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">Vehicles</h2>
+              <p className="text-faint text-sm">{vehicles.length} protected</p>
             </div>
             <button
               onClick={() => setShowAddVehicle(true)}
-              className="px-5 py-2.5 sm:px-6 sm:py-3 bg-white text-black rounded-full font-semibold text-sm transition-transform active:scale-95 flex items-center gap-2"
+              className="px-4 py-2 bg-brand text-white font-semibold text-sm transition-colors hover:bg-brand-dark flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Add Vehicle
+              <Plus className="w-4 h-4" /> Add
             </button>
           </div>
 
-          <div className="flex flex-col gap-4 overflow-hidden">
+          <div className="flex flex-col overflow-y-auto flex-1">
             {vehicles.map((vehicle) => (
               <button
                 key={vehicle.id}
                 onClick={() => { setSelectedVehicle(vehicle); setShowSticker(false); }}
-                className={`p-4 sm:p-5 rounded-3xl border flex items-center gap-4 sm:gap-6 transition-colors cursor-pointer text-left ${
- selectedVehicle.id === vehicle.id ? 'bg-soft border-line' : 'bg-surface border-line hover:bg-soft'
- }`}
+                className={`px-5 sm:px-6 py-4 flex items-center gap-4 transition-colors cursor-pointer text-left border-b border-line border-l-2 ${
+                  selectedVehicle.id === vehicle.id
+                    ? 'bg-soft border-l-brand'
+                    : 'bg-transparent border-l-transparent hover:bg-soft/50'
+                }`}
               >
-                <div className="w-16 h-16 bg-soft rounded-2xl flex items-center justify-center shrink-0">
-                  {vehicle.type === 'car' ? <Car className="w-8 h-8 text-brand" /> : <Bike className="w-8 h-8 text-brand" />}
+                <div className="w-12 h-12 bg-soft flex items-center justify-center shrink-0">
+                  {vehicle.type === 'car' ? <Car className="w-6 h-6 text-brand" /> : <Bike className="w-6 h-6 text-brand" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-semibold truncate">
-                    {vehicle.name}{' '}
-                    <span className="text-faint text-xs ml-2 uppercase tracking-widest">{vehicle.number}</span>
-                  </h3>
-                  <p className="text-sm text-muted truncate">Status: {vehicle.active ? 'Protected' : 'Inactive'}</p>
+                  <h3 className="text-base font-semibold truncate">{vehicle.name}</h3>
+                  <p className="text-xs font-mono text-muted truncate uppercase tracking-wider">{vehicle.number}</p>
                 </div>
-                <div className={`h-8 px-3 rounded-lg text-[10px] font-bold flex items-center uppercase tracking-wider shrink-0 ${
- vehicle.active ? 'bg-brand/10 text-brand' : 'bg-soft text-faint'
- }`}>
+                <div className={`h-7 px-2.5 text-[10px] font-bold flex items-center uppercase tracking-wider shrink-0 ${
+                  vehicle.active ? 'bg-brand/10 text-brand' : 'bg-soft text-faint'
+                }`}>
                   {vehicle.active ? 'Live' : 'Off'}
                 </div>
               </button>
             ))}
           </div>
 
-          <div className="mt-auto pt-6">
+          <div className="mt-auto p-5 sm:p-6 border-t border-line">
             <button
               onClick={handleTheftModeToggle}
-              className="w-full p-6 bg-orange-600/10 border border-orange-500/20 rounded-3xl flex items-center justify-between hover:bg-orange-600/15 transition-colors text-left"
+              className="w-full p-4 bg-orange-600/10 border border-orange-500/20 flex items-center justify-between hover:bg-orange-600/15 transition-colors text-left"
             >
               <div>
                 <h4 className="text-orange-400 font-bold text-sm uppercase tracking-wider">Theft Mode</h4>
-                <p className="text-xs text-orange-200/60">Priority push/SMS alerts when someone contacts this vehicle.</p>
+                <p className="text-xs text-muted mt-0.5">Priority alerts for this vehicle</p>
               </div>
               <div className={`w-12 h-6 rounded-full relative shrink-0 transition-colors ${selectedVehicle.theftMode ? 'bg-orange-500' : 'bg-soft'}`}>
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${selectedVehicle.theftMode ? 'left-7' : 'left-1'}`} />
               </div>
             </button>
           </div>
-        </div>
-      </div>
+      </aside>
 
-      <div className={`bg-surface border border-line rounded-3xl sm:rounded-[40px] p-4 sm:p-8 min-h-0 sm:min-h-[500px] ${
- showSticker ? 'md:col-span-12' : 'md:col-span-7'
- }`}>
+      <div className={`min-h-0 bg-canvas ${showSticker ? 'lg:col-span-12' : 'lg:col-span-8 xl:col-span-9'}`}>
         <AnimatePresence mode="wait">
           {!showSticker ? (
             <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
-              <div className="flex gap-2 mb-6">
+              <nav className="flex gap-0 px-4 sm:px-6 lg:px-8 border-b border-line bg-surface overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => { setTab('overview'); closeOpenChat(); }}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium ${detailTab === 'overview' ? 'bg-brand text-white' : 'text-muted hover:text-ink'}`}
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    detailTab === 'overview' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
+                  }`}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setTab('messages')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'messages' ? 'bg-brand text-white' : 'text-muted hover:text-ink'}`}
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                    detailTab === 'messages' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
+                  }`}
                 >
                   <MessageSquare className="w-4 h-4" />
                   Messages
@@ -770,12 +769,16 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 </button>
                 <button
                   onClick={() => setTab('vault')}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 ${detailTab === 'vault' ? 'bg-brand/10 text-brand' : 'text-muted hover:text-ink'}`}
+                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 ${
+                    detailTab === 'vault' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
+                  }`}
                 >
                   <FolderLock className="w-4 h-4" />
                   Vault
                 </button>
-              </div>
+              </nav>
+
+              <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
               {detailTab === 'vault' ? (
                 <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scroll">
@@ -882,18 +885,18 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="p-4 rounded-2xl bg-surface border border-line">
+              <div className="grid grid-cols-2 gap-0 mb-8 border border-line divide-x divide-line bg-surface">
+                <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">
                     <BellRing className="w-4 h-4 text-muted" />
-                    <h3 className="font-medium text-muted">Total Pings</h3>
+                    <h3 className="font-medium text-muted text-sm">Total Pings</h3>
                   </div>
                   <p className="text-3xl font-display font-bold text-ink">{selectedVehicle.totalPings}</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-surface border border-line">
+                <div className="p-5">
                   <div className="flex items-center gap-2 mb-2">
                     <Phone className="w-4 h-4 text-muted" />
-                    <h3 className="font-medium text-muted">Voice Calls</h3>
+                    <h3 className="font-medium text-muted text-sm">Voice Calls</h3>
                   </div>
                   <p className="text-3xl font-display font-bold text-ink">{selectedVehicle.callsMasked}</p>
                 </div>
@@ -913,9 +916,10 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               </div>
               </>
               )}
+              </div>
             </motion.div>
           ) : (
-            <motion.div key="sticker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
+            <motion.div key="sticker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col px-4 sm:px-6 lg:px-8 py-6">
               {selectedVehicle.stickerCode ? (
                 <>
                   <StickerStudio
@@ -968,6 +972,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
       </div>
     </motion.div>
     {showAddVehicle && (

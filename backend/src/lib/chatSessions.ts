@@ -32,6 +32,7 @@ export type ChatMessageDto = {
   body: string;
   isQuickReply: boolean;
   createdAt: string;
+  readAt: string | null;
 };
 
 export type ChatSessionDto = {
@@ -39,6 +40,8 @@ export type ChatSessionDto = {
   vehicleId: string;
   vehicleName: string;
   vehicleNumber: string;
+  ownerName: string;
+  scannerName: string | null;
   status: ChatSessionStatus;
   callRoomId: string | null;
   canSend: boolean;
@@ -50,6 +53,11 @@ export type ChatSessionDto = {
   ownerQuickReplies: readonly string[];
 };
 
+type SessionWithRelations = ChatSession & {
+  vehicle: { id: string; name: string; number: string; owner: { name: string } };
+  messages: ChatMessage[];
+};
+
 function toMessageDto(m: ChatMessage): ChatMessageDto {
   return {
     id: m.id,
@@ -57,6 +65,7 @@ function toMessageDto(m: ChatMessage): ChatMessageDto {
     body: m.body,
     isQuickReply: m.isQuickReply,
     createdAt: m.createdAt.toISOString(),
+    readAt: m.readAt?.toISOString() ?? null,
   };
 }
 
@@ -96,22 +105,43 @@ export async function refreshSessionLifecycle(session: ChatSession): Promise<Cha
   return session;
 }
 
-async function loadSessionWithVehicle(sessionId: string) {
+async function loadSessionWithVehicle(sessionId: string): Promise<SessionWithRelations | null> {
   return prisma.chatSession.findUnique({
     where: { id: sessionId },
     include: {
-      vehicle: { select: { id: true, name: true, number: true } },
+      vehicle: {
+        select: {
+          id: true,
+          name: true,
+          number: true,
+          owner: { select: { name: true } },
+        },
+      },
       messages: { orderBy: { createdAt: 'asc' } },
     },
   });
 }
 
+/** Mark the other party's unread messages as read. Returns true if any rows updated. */
+export async function markMessagesRead(
+  sessionId: string,
+  readerRole: 'scanner' | 'owner'
+): Promise<boolean> {
+  const otherRole = readerRole === 'owner' ? 'SCANNER' : 'OWNER';
+  const result = await prisma.chatMessage.updateMany({
+    where: {
+      sessionId,
+      senderRole: otherRole,
+      readAt: null,
+    },
+    data: { readAt: new Date() },
+  });
+  return result.count > 0;
+}
+
 export function formatSessionDto(
-  session: ChatSession & {
-    vehicle: { id: string; name: string; number: string };
-    messages: ChatMessage[];
-  },
-  role: 'scanner' | 'owner'
+  session: SessionWithRelations,
+  _role: 'scanner' | 'owner'
 ): ChatSessionDto {
   const readOnly = session.status === 'READ_ONLY';
   const canSend = session.status === 'ACTIVE';
@@ -121,6 +151,8 @@ export function formatSessionDto(
     vehicleId: session.vehicleId,
     vehicleName: session.vehicle.name,
     vehicleNumber: session.vehicle.number,
+    ownerName: session.vehicle.owner.name,
+    scannerName: session.scannerName?.trim() || null,
     status: session.status,
     callRoomId: session.callRoomId,
     canSend,
@@ -135,11 +167,17 @@ export function formatSessionDto(
 
 export async function getSessionDtoForRole(
   sessionId: string,
-  role: 'scanner' | 'owner'
+  role: 'scanner' | 'owner',
+  opts?: { markRead?: boolean }
 ): Promise<ChatSessionDto | null> {
   const loaded = await loadSessionWithVehicle(sessionId);
   if (!loaded) return null;
   const session = await refreshSessionLifecycle(loaded);
+
+  if (opts?.markRead !== false) {
+    await markMessagesRead(session.id, role);
+  }
+
   const refreshed = await loadSessionWithVehicle(session.id);
   if (!refreshed) return null;
   return formatSessionDto(refreshed, role);
@@ -151,6 +189,7 @@ export async function ensureChatSession(opts: {
   callRoomId?: string | null;
   reason?: ContactReason | null;
   scannerToken?: string;
+  scannerName?: string | null;
 }): Promise<{ sessionId: string; scannerToken: string; created: boolean }> {
   const open = await prisma.chatSession.findFirst({
     where: {
@@ -163,12 +202,15 @@ export async function ensureChatSession(opts: {
   if (open) {
     const refreshed = await refreshSessionLifecycle(open);
     if (refreshed.status === 'ACTIVE' || refreshed.status === 'READ_ONLY') {
-      const updates: { callRoomId?: string; activeUntil?: Date } = {};
+      const updates: { callRoomId?: string; activeUntil?: Date; scannerName?: string } = {};
       if (opts.callRoomId && !refreshed.callRoomId) {
         updates.callRoomId = opts.callRoomId;
       }
       if (refreshed.status === 'ACTIVE') {
         updates.activeUntil = new Date(Date.now() + ACTIVE_WINDOW_MS);
+      }
+      if (opts.scannerName?.trim() && !refreshed.scannerName) {
+        updates.scannerName = opts.scannerName.trim();
       }
       if (Object.keys(updates).length > 0) {
         await prisma.chatSession.update({ where: { id: refreshed.id }, data: updates });
@@ -182,11 +224,14 @@ export async function ensureChatSession(opts: {
     throw new Error('blocked');
   }
 
+  const scannerName = opts.scannerName?.trim() || null;
+
   const session = await prisma.chatSession.create({
     data: {
       vehicleId: opts.vehicleId,
       ownerId: opts.ownerId,
       scannerToken,
+      scannerName,
       callRoomId: opts.callRoomId ?? null,
       reason: opts.reason ?? null,
       status: 'ACTIVE',
@@ -198,7 +243,9 @@ export async function ensureChatSession(opts: {
     data: {
       vehicleId: opts.vehicleId,
       type: 'chat',
-      description: 'Anonymous chat started',
+      description: scannerName
+        ? `Chat started by ${scannerName}`
+        : 'Anonymous chat started',
     },
   });
 
@@ -265,7 +312,7 @@ export async function appendChatMessage(opts: {
     });
   }
 
-  const dto = await getSessionDtoForRole(opts.sessionId, role);
+  const dto = await getSessionDtoForRole(opts.sessionId, role, { markRead: false });
   if (!dto) return { error: 'Chat session not found', status: 404 };
 
   return {
