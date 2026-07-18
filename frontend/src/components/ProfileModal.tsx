@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import {
-  X,
+  ArrowLeft,
   Loader2,
   User,
   Phone,
@@ -12,7 +12,6 @@ import {
   Check,
   Pencil,
   ShieldCheck,
-  Calendar,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -34,7 +33,7 @@ function memberSince(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 export default function ProfileModal({ onClose }: ProfileModalProps) {
@@ -104,9 +103,9 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
     try {
       const result = await api.testPush();
       if (result.sent > 0) {
-        setTestResult(`Sent to ${result.sent} of ${result.total} device(s) — check your notifications.`);
+        setTestResult(`Sent to ${result.sent} of ${result.total} device(s).`);
       } else {
-        setTestResult(result.errors[0] ?? 'No devices received the test. Enable notifications on this device first.');
+        setTestResult(result.errors[0] ?? 'No devices received the test.');
       }
     } catch (err) {
       setTestResult(err instanceof Error ? err.message : 'Test failed');
@@ -116,55 +115,53 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/40" onClick={onClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-surface border border-line rounded-[32px] relative overflow-hidden max-h-[90vh] overflow-y-auto custom-scroll"
-      >
-        {/* Header with gradient + avatar */}
-        <div className="relative px-8 pt-10 pb-6 bg-gradient-to-br from-brand/20 via-brand/10 to-transparent">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full bg-black/20 text-muted hover:text-ink hover:bg-black/40 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex flex-col bg-canvas"
+    >
+      <header className="shrink-0 flex items-center gap-3 px-4 sm:px-6 h-14 border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
+        <button
+          type="button"
+          onClick={onClose}
+          className="p-2 -ml-1 rounded-full text-muted hover:text-ink hover:bg-soft transition-colors"
+          aria-label="Back"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-base font-semibold text-ink">Profile</h1>
+      </header>
 
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-brand/20 shrink-0">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scroll">
+        <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 py-6 sm:py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-xl sm:text-2xl font-bold text-white shrink-0">
               {initials(owner.name) || <User className="w-7 h-7" />}
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl font-bold truncate">{owner.name}</h2>
-              <p className="text-muted text-sm truncate">{owner.email}</p>
-              {joined && (
-                <p className="text-faint text-xs mt-0.5 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Member since {joined}
-                </p>
-              )}
+              <p className="text-xl sm:text-2xl font-bold truncate leading-tight">{owner.name}</p>
+              <p className="text-sm text-muted truncate mt-0.5">{owner.email}</p>
+              {joined && <p className="text-xs text-faint mt-1">Member since {joined}</p>}
             </div>
           </div>
-        </div>
 
-        <div className="px-8 pb-8 pt-6 space-y-5">
           {saved && (
-            <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 text-emerald-300 text-sm">
+            <div className="mb-5 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-emerald-400 text-sm">
               <Check className="w-4 h-4 shrink-0" /> Profile updated
             </div>
           )}
 
-          {/* Personal details */}
-          <div className="rounded-2xl border border-line bg-soft p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-ink uppercase tracking-wider">Personal details</h3>
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Personal details</h2>
               {!editing && (
                 <button
+                  type="button"
                   onClick={() => setEditing(true)}
-                  className="text-xs text-brand hover:text-brand flex items-center gap-1"
+                  className="text-sm text-brand hover:text-brand-dark flex items-center gap-1"
                 >
-                  <Pencil className="w-3 h-3" /> Edit
+                  <Pencil className="w-3.5 h-3.5" /> Edit
                 </button>
               )}
             </div>
@@ -179,7 +176,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     placeholder="Your name"
                     required
                     maxLength={80}
-                    className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-line outline-none focus:border-brand/50 text-sm"
                   />
                 </div>
                 <div>
@@ -190,18 +187,15 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     placeholder="+91 98765 43210"
                     required
                     inputMode="tel"
-                    className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50 font-mono"
+                    className="w-full px-4 py-3 rounded-xl bg-surface border border-line outline-none focus:border-brand/50 font-mono text-sm"
                   />
-                  <p className="text-[11px] text-faint mt-1">SMS alerts about your vehicle are sent to this number.</p>
                 </div>
-
                 {error && <p className="text-brand text-sm">{error}</p>}
-
                 <div className="flex gap-2 pt-1">
                   <button
                     type="submit"
                     disabled={saving || !name.trim() || !phone.trim()}
-                    className="flex-1 py-3 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors text-white"
+                    className="flex-1 py-3 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm text-white"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     Save
@@ -210,103 +204,103 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     type="button"
                     onClick={handleCancelEdit}
                     disabled={saving}
-                    className="px-5 py-3 bg-soft hover:bg-soft rounded-2xl text-sm transition-colors"
+                    className="px-5 py-3 rounded-xl text-sm text-muted hover:text-ink hover:bg-soft"
                   >
                     Cancel
                   </button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-surface"><User className="w-4 h-4 text-brand" /></div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-faint">Full name</p>
+              <ul className="divide-y divide-line border-y border-line">
+                <li className="flex items-center gap-3 py-3.5">
+                  <User className="w-4 h-4 text-brand shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-faint">Full name</p>
                     <p className="text-sm font-medium truncate">{owner.name}</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-surface"><Phone className="w-4 h-4 text-emerald-400" /></div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-faint">Mobile number</p>
+                </li>
+                <li className="flex items-center gap-3 py-3.5">
+                  <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-faint">Mobile number</p>
                     <p className="text-sm font-medium font-mono truncate">{owner.phone || 'Not set'}</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-surface"><Mail className="w-4 h-4 text-amber-400" /></div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-faint">Email</p>
+                </li>
+                <li className="flex items-center gap-3 py-3.5">
+                  <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] text-faint">Email</p>
                     <p className="text-sm font-medium truncate">{owner.email}</p>
                   </div>
-                </div>
-              </div>
+                </li>
+              </ul>
             )}
-          </div>
+          </section>
 
-          {/* Notifications */}
-          <div className="rounded-2xl border border-line bg-soft p-5">
-            <h3 className="text-sm font-semibold text-ink uppercase tracking-wider mb-4">Notifications</h3>
-            <div className="flex items-center justify-between gap-3">
+          <section className="mb-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Notifications</h2>
+
+            <div className="flex items-center justify-between gap-3 py-3 border-t border-line">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`p-2 rounded-xl ${pushEnabled ? 'bg-emerald-500/10' : 'bg-surface'}`}>
-                  {pushEnabled
-                    ? <BellRing className="w-4 h-4 text-emerald-400" />
-                    : <Bell className="w-4 h-4 text-faint" />}
-                </div>
+                {pushEnabled ? (
+                  <BellRing className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <Bell className="w-4 h-4 text-faint shrink-0" />
+                )}
                 <div className="min-w-0">
                   <p className="text-sm font-medium">Push alerts on this device</p>
                   <p className="text-xs text-faint">
-                    {pushEnabled ? 'Enabled — you will get instant alerts here.' : 'Off — enable to get instant alerts.'}
+                    {pushEnabled ? 'Enabled — instant alerts here' : 'Off — enable for instant alerts'}
                   </p>
                 </div>
               </div>
               {pushEnabled ? (
-                <span className="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                <span className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-bold uppercase tracking-wider shrink-0">
                   On
                 </span>
               ) : (
                 <button
+                  type="button"
                   onClick={handleEnablePush}
                   disabled={pushLoading}
-                  className="px-4 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0 transition-colors text-white"
+                  className="px-3.5 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 text-white"
                 >
-                  {pushLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                  {pushLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                   Enable
                 </button>
               )}
             </div>
-            <div className="mt-3">
-              <button
-                onClick={handleTestPush}
-                disabled={testLoading}
-                className="w-full py-2.5 rounded-xl bg-soft hover:bg-soft disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2 transition-colors"
-              >
-                {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
-                Send test notification
-              </button>
-              {testResult && (
-                <p className="text-xs text-muted mt-2 text-center leading-relaxed">{testResult}</p>
-              )}
-            </div>
-            <div className="mt-4 flex items-start gap-3 p-3 rounded-xl bg-soft border border-line">
+
+            <button
+              type="button"
+              onClick={handleTestPush}
+              disabled={testLoading}
+              className="mt-2 w-full py-2.5 rounded-xl border border-line bg-surface hover:bg-soft disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+            >
+              {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+              Send test notification
+            </button>
+            {testResult && <p className="text-xs text-muted mt-2 text-center">{testResult}</p>}
+
+            <div className="mt-4 flex items-start gap-2.5">
               <ShieldCheck className="w-4 h-4 text-brand shrink-0 mt-0.5" />
               <p className="text-xs text-faint leading-relaxed">
-                Your phone number stays private. Scanners contact you through anonymous in-app calls and alerts — they never see your details.
+                Your phone stays private. Scanners only reach you through anonymous in-app alerts.
               </p>
             </div>
-          </div>
+          </section>
 
-          {!editing && error && <p className="text-brand text-sm">{error}</p>}
+          {!editing && error && <p className="text-brand text-sm mb-4">{error}</p>}
 
-          {/* Sign out */}
           <button
+            type="button"
             onClick={signOut}
-            className="w-full py-3 bg-red-600/15 border border-red-500/25 text-brand hover:bg-red-600/25 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-3 text-brand hover:bg-brand/10 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm transition-colors border border-brand/20"
           >
             <LogOut className="w-4 h-4" /> Sign out
           </button>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
