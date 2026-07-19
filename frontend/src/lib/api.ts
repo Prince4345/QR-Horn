@@ -369,10 +369,13 @@ export const api = {
       body: JSON.stringify(data ?? {}),
     }),
 
-  getScannerChat: (sessionId: string, token: string) =>
-    request<import('./chatClient').ChatSession>(
-      `/api/chat/scanner/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(token)}`
-    ),
+  getScannerChat: (sessionId: string, token: string, opts?: { markRead?: boolean }) => {
+    const params = new URLSearchParams({ token });
+    if (opts?.markRead === false) params.set('markRead', '0');
+    return request<import('./chatClient').ChatSession>(
+      `/api/chat/scanner/${encodeURIComponent(sessionId)}?${params}`
+    );
+  },
 
   sendScannerChatMessage: (sessionId: string, token: string, body: string, isQuickReply?: boolean) =>
     request<{ message: import('./chatClient').ChatMessage; session: import('./chatClient').ChatSession }>(
@@ -382,8 +385,12 @@ export const api = {
 
   getChatSessions: () => request<import('./chatClient').ChatSessionSummary[]>('/api/chat/sessions'),
 
-  getChatSession: (sessionId: string) =>
-    request<import('./chatClient').ChatSession>(`/api/chat/sessions/${encodeURIComponent(sessionId)}`),
+  getChatSession: (sessionId: string, opts?: { markRead?: boolean }) => {
+    const q = opts?.markRead === false ? '?markRead=0' : '';
+    return request<import('./chatClient').ChatSession>(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}${q}`
+    );
+  },
 
   sendOwnerChatMessage: (sessionId: string, body: string, isQuickReply?: boolean) =>
     request<{ message: import('./chatClient').ChatMessage; session: import('./chatClient').ChatSession }>(

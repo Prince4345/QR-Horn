@@ -32,6 +32,7 @@ interface AuthContextValue {
   enablePushNotifications: () => Promise<boolean>;
   preparePushNotifications: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  pushEnabled: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

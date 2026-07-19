@@ -21,7 +21,6 @@ type OptimisticMessage = {
   status: 'pending' | 'failed';
   isQuickReply?: boolean;
   createdAt: number;
-  serverMineCountAtSend: number;
 };
 
 type DisplayMessage = {
@@ -59,8 +58,9 @@ export default function ChatPanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const stickToBottomRef = useRef(true);
 
   const mySenderRole = role === 'scanner' ? 'SCANNER' : 'OWNER';
 
@@ -70,16 +70,31 @@ export default function ChatPanel({
       setPending([]);
       setText('');
       setError(null);
+      stickToBottomRef.current = true;
     }
   }, [session?.id]);
 
-  // Confirm optimistic rows when a new server message from us arrives (socket may beat HTTP)
+  // Confirm optimistic rows by matching body against newer server messages
   useEffect(() => {
     if (!session || pending.length === 0) return;
-    const mineCount = session.messages.filter((m) => m.senderRole === mySenderRole).length;
-    setPending((prev) =>
-      prev.filter((p) => p.status === 'failed' || mineCount <= p.serverMineCountAtSend)
-    );
+    setPending((prev) => {
+      const used = new Set<string>();
+      return prev.filter((p) => {
+        if (p.status === 'failed') return true;
+        const match = session.messages.find(
+          (m) =>
+            m.senderRole === mySenderRole &&
+            m.body === p.body &&
+            !used.has(m.id) &&
+            new Date(m.createdAt).getTime() >= p.createdAt - 15_000
+        );
+        if (match) {
+          used.add(match.id);
+          return false;
+        }
+        return true;
+      });
+    });
   }, [session?.messages, mySenderRole, pending.length, session]);
 
   const displayMessages = useMemo((): DisplayMessage[] => {
@@ -102,9 +117,23 @@ export default function ChatPanel({
     return [...server, ...optimistic];
   }, [session, pending, mySenderRole]);
 
+  const scrollListToBottom = useCallback((smooth: boolean) => {
+    const el = listRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayMessages.length, pending.length]);
+    if (!stickToBottomRef.current) return;
+    scrollListToBottom(true);
+  }, [displayMessages.length, pending.length, scrollListToBottom]);
+
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distance < 80;
+  };
 
   const quickReplies =
     role === 'scanner' ? session?.scannerQuickReplies ?? [] : session?.ownerQuickReplies ?? [];
@@ -115,18 +144,15 @@ export default function ChatPanel({
       if (!trimmed || sending) return;
 
       const tempId = `opt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const serverMineCountAtSend = session
-        ? session.messages.filter((m) => m.senderRole === mySenderRole).length
-        : 0;
       const optimistic: OptimisticMessage = {
         id: tempId,
         body: trimmed,
         status: 'pending',
         isQuickReply,
         createdAt: Date.now(),
-        serverMineCountAtSend,
       };
 
+      stickToBottomRef.current = true;
       setPending((prev) => [...prev, optimistic]);
       setText('');
       setSending(true);
@@ -149,7 +175,7 @@ export default function ChatPanel({
         setSending(false);
       }
     },
-    [onSend, sending, session, mySenderRole]
+    [onSend, sending]
   );
 
   const retryFailed = useCallback(
@@ -160,7 +186,8 @@ export default function ChatPanel({
     [handleSend]
   );
 
-  if (loading) {
+  // Soft loading: keep showing the open thread instead of a full-panel spinner
+  if (loading && !session) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-brand" />
@@ -193,7 +220,11 @@ export default function ChatPanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto scrollbar-none space-y-3 min-h-0 py-1">
+      <div
+        ref={listRef}
+        onScroll={onListScroll}
+        className="flex-1 overflow-y-auto scrollbar-none space-y-3 min-h-0 py-1"
+      >
         {displayMessages.length === 0 ? (
           <p className="text-muted text-sm text-center py-8">
             {role === 'scanner'
@@ -254,7 +285,6 @@ export default function ChatPanel({
             );
           })
         )}
-        <div ref={bottomRef} />
       </div>
 
       {session.canSend && (

@@ -103,9 +103,19 @@ export default function OwnerMessagesView({
           showMobileChat ? 'hidden lg:flex' : 'flex flex-1 lg:flex-none'
         }`}
       >
-        <div className="px-5 py-4 border-b border-line shrink-0">
-          <h1 className="text-xl font-semibold tracking-tight">Messages</h1>
-          <p className="text-xs text-muted mt-0.5">Conversations from vehicle scans</p>
+        <div className="px-5 py-4 border-b border-line shrink-0 flex items-start gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-2 -ml-1 mt-0.5 rounded-lg hover:bg-soft text-ink lg:hidden"
+            aria-label="Back to dashboard"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">Messages</h1>
+            <p className="text-xs text-muted mt-0.5">Conversations from vehicle scans</p>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto scrollbar-none min-h-0">
           <ConversationList

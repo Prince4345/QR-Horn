@@ -30,6 +30,7 @@ import {
   chatSessionIdFromLocation,
   countOwnerUnread,
   getLatestOwnerMessage,
+  isStaleChatSession,
   joinChatAsScanner,
   loadPendingScannerChat,
   loadScannerLastSeen,
@@ -137,7 +138,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
 
   const handleIncomingSession = useCallback((session: ChatSession, fromOwnerMessage?: boolean) => {
     if (session.id !== chatSessionIdRef.current) return;
-    setChatSession(session);
+    setChatSession((prev) => (isStaleChatSession(session, prev) ? prev : session));
 
     const unread = countOwnerUnread(session, lastSeenRef.current);
     if (unread <= 0 || chatOpenRef.current) return;
@@ -412,8 +413,11 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
 
   useEffect(() => {
     if (!chatSessionId || !scannerToken) return;
+    let lastMsgId: string | null = null;
     const unsubMsg = subscribeChatMessages(({ sessionId, message, session }) => {
       if (sessionId !== chatSessionId) return;
+      if (lastMsgId === message.id) return;
+      lastMsgId = message.id;
       handleIncomingSession(session, message.senderRole === 'OWNER');
     });
     const unsubSession = subscribeChatSessionUpdates((session) => {
@@ -423,7 +427,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     const poll = setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void api
-        .getScannerChat(chatSessionId, scannerToken)
+        .getScannerChat(chatSessionId, scannerToken, { markRead: false })
         .then((session) => handleIncomingSession(session))
         .catch(() => {});
     }, 3000);

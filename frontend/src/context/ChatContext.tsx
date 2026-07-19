@@ -11,6 +11,7 @@ import {
   type ChatSession,
   type IncomingChat,
   chatSessionIdFromLocation,
+  isStaleChatSession,
   joinChatAsOwner,
   navigateToOwnerChat,
   subscribeChatMessages,
@@ -62,10 +63,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof api.getChatSessions>>>([]);
   const openSessionIdRef = useRef<string | null>(null);
+  const activeSessionRef = useRef<ChatSession | null>(null);
+  const fetchGenRef = useRef(0);
   const dismissedRef = useRef<Set<string>>(new Set());
   const lastSeenRef = useRef<Map<string, string>>(new Map());
+  const lastMsgIdRef = useRef<Map<string, string>>(new Map());
 
   openSessionIdRef.current = openSessionId;
+  activeSessionRef.current = activeSession;
 
   const unreadCount = sessions.filter(
     (s) =>
@@ -73,6 +78,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       s.id !== openSessionId &&
       lastSeenRef.current.get(s.id) !== s.lastMessage.createdAt
   ).length;
+
+  const applyActiveSession = useCallback((session: ChatSession) => {
+    setActiveSession((prev) => {
+      if (isStaleChatSession(session, prev)) return prev;
+      return session;
+    });
+  }, []);
 
   const refreshSessions = useCallback(async () => {
     if (!owner?.id) {
@@ -96,20 +108,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const loadSession = useCallback(
     async (sessionId: string) => {
       if (!owner?.id) return;
-      setLoadingSession(true);
+      const soft =
+        openSessionIdRef.current === sessionId && activeSessionRef.current?.id === sessionId;
+      const gen = ++fetchGenRef.current;
+      if (!soft) setLoadingSession(true);
       try {
         const session = await api.getChatSession(sessionId);
-        setActiveSession(session);
+        if (gen !== fetchGenRef.current) return;
+        applyActiveSession(session);
         const last = session.messages[session.messages.length - 1];
         if (last) lastSeenRef.current.set(sessionId, last.createdAt);
         await joinChatAsOwner(sessionId, owner.id);
       } catch {
-        setActiveSession(null);
+        if (gen === fetchGenRef.current) setActiveSession(null);
       } finally {
-        setLoadingSession(false);
+        if (gen === fetchGenRef.current) setLoadingSession(false);
       }
     },
-    [owner?.id]
+    [owner?.id, applyActiveSession]
   );
 
   const openChat = useCallback(
@@ -144,11 +160,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (body: string, isQuickReply?: boolean) => {
       if (!openSessionId) return;
       const result = await api.sendOwnerChatMessage(openSessionId, body, isQuickReply);
-      setActiveSession(result.session);
+      applyActiveSession(result.session);
       const last = result.session.messages[result.session.messages.length - 1];
       if (last) lastSeenRef.current.set(openSessionId, last.createdAt);
     },
-    [openSessionId]
+    [openSessionId, applyActiveSession]
   );
 
   const blockSession = useCallback(
@@ -162,7 +178,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [openSessionId, closeOpenChat, refreshSessions]
   );
 
-  // Owner socket room (chat:incoming + chat:message on owner room)
   useEffect(() => {
     if (!owner?.id) return;
     registerOwnerSocket(owner.id);
@@ -170,13 +185,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   useVisibleInterval(() => void refreshSessions(), POLL_MS, !!owner?.id);
 
-  // Poll open conversation as socket fallback
+  // Poll open conversation as socket fallback — do not mark-read (avoids tick flicker)
   useVisibleInterval(
     () => {
       if (!openSessionId) return;
       void api
-        .getChatSession(openSessionId)
-        .then((session) => setActiveSession(session))
+        .getChatSession(openSessionId, { markRead: false })
+        .then((session) => {
+          if (openSessionIdRef.current !== session.id) return;
+          applyActiveSession(session);
+        })
         .catch(() => {});
     },
     POLL_MS,
@@ -188,11 +206,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const handleScannerMessage = (
       sessionId: string,
-      message: { body: string; senderRole: string; createdAt: string },
+      message: { id: string; body: string; senderRole: string; createdAt: string },
       session: ChatSession
     ) => {
+      // Deduplicate double socket delivery (chat room + owner room)
+      if (lastMsgIdRef.current.get(sessionId) === message.id) return;
+      lastMsgIdRef.current.set(sessionId, message.id);
+
       if (openSessionIdRef.current === sessionId) {
-        setActiveSession(session);
+        applyActiveSession(session);
         lastSeenRef.current.set(sessionId, message.createdAt);
         return;
       }
@@ -215,7 +237,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const unsubSession = subscribeChatSessionUpdates((session) => {
       if (openSessionIdRef.current === session.id) {
-        setActiveSession(session);
+        applyActiveSession(session);
       }
       void refreshSessions();
     });
@@ -225,7 +247,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       const sessionId = chatSessionIdFromLocation();
       if (!sessionId) return;
       void api
-        .getChatSession(sessionId)
+        .getChatSession(sessionId, { markRead: false })
         .then((session) => {
           const last = session.messages[session.messages.length - 1];
           if (last?.senderRole === 'SCANNER') {
@@ -242,7 +264,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
     const onOpenChat = (event: Event) => {
       const sessionId = (event as CustomEvent<{ sessionId: string }>).detail?.sessionId;
-      if (sessionId) void openChat(sessionId, { navigate: false });
+      if (!sessionId) return;
+      // Already viewing this thread — soft refresh only (no spinner remount)
+      if (openSessionIdRef.current === sessionId) {
+        void api
+          .getChatSession(sessionId)
+          .then((session) => applyActiveSession(session))
+          .catch(() => {});
+        return;
+      }
+      void openChat(sessionId, { navigate: false });
     };
 
     window.addEventListener('qrhorn:incoming-chat', onIncomingChatPush);
@@ -257,7 +288,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('qrhorn:open-chat', onOpenChat);
       window.removeEventListener('qrhorn:ping', onIncomingChatPush);
     };
-  }, [owner?.id, refreshSessions, showIncoming, openChat]);
+  }, [owner?.id, refreshSessions, showIncoming, openChat, applyActiveSession]);
 
   return (
     <ChatContext.Provider

@@ -91,20 +91,19 @@ router.get('/sessions', requireAuth, async (req: AuthRequest, res) => {
     for (const s of sessions) {
       const refreshed = await refreshSessionLifecycle(s);
       if (refreshed.status === 'CLOSED' || refreshed.status === 'BLOCKED') continue;
-      const full = await getOwnerSession(refreshed.id, req.ownerId);
-      if (!full) continue;
-      const last = full.messages[full.messages.length - 1];
+      // Use list query includes on `s` — lifecycle update may drop relations
+      const last = s.messages[0] ?? null;
       result.push({
-        id: full.id,
-        vehicleId: full.vehicleId,
-        vehicleName: full.vehicle.name,
-        vehicleNumber: full.vehicle.number,
-        ownerName: full.vehicle.owner.name,
-        scannerName: full.scannerName?.trim() || null,
-        status: full.status,
-        callRoomId: full.callRoomId,
-        readOnly: full.status === 'READ_ONLY',
-        updatedAt: full.updatedAt.toISOString(),
+        id: refreshed.id,
+        vehicleId: refreshed.vehicleId,
+        vehicleName: s.vehicle.name,
+        vehicleNumber: s.vehicle.number,
+        ownerName: s.vehicle.owner.name,
+        scannerName: refreshed.scannerName?.trim() || null,
+        status: refreshed.status,
+        callRoomId: refreshed.callRoomId,
+        readOnly: refreshed.status === 'READ_ONLY',
+        updatedAt: refreshed.updatedAt.toISOString(),
         lastMessage: last
           ? {
               body: last.body,
@@ -136,13 +135,14 @@ router.get('/sessions/:sessionId', requireAuth, async (req: AuthRequest, res) =>
       res.status(404).json({ error: 'Chat session not found' });
       return;
     }
-    const dto = await getSessionDtoForRole(req.params.sessionId, 'owner', { markRead: true });
+    const markRead = req.query.markRead !== '0' && req.query.markRead !== 'false';
+    const dto = await getSessionDtoForRole(req.params.sessionId, 'owner', { markRead });
     if (!dto) {
       res.status(404).json({ error: 'Chat session not found' });
       return;
     }
     // Let the scanner see double-ticks when the owner opens the thread
-    emitChatSessionUpdate(req.ownerId, dto);
+    if (markRead) emitChatSessionUpdate(req.ownerId, dto);
     res.json(dto);
   } catch (error) {
     console.error('GET /api/chat/sessions/:sessionId:', error);
@@ -274,12 +274,13 @@ router.get('/scanner/:sessionId', async (req, res) => {
       return;
     }
 
-    const dto = await getSessionDtoForRole(req.params.sessionId, 'scanner', { markRead: true });
+    const markRead = req.query.markRead !== '0' && req.query.markRead !== 'false';
+    const dto = await getSessionDtoForRole(req.params.sessionId, 'scanner', { markRead });
     if (!dto) {
       res.status(404).json({ error: 'Chat session not found' });
       return;
     }
-    emitChatSessionUpdate(session.ownerId, dto);
+    if (markRead) emitChatSessionUpdate(session.ownerId, dto);
     res.json(dto);
   } catch (error) {
     console.error('GET /api/chat/scanner/:sessionId:', error);

@@ -269,14 +269,17 @@ export function emitChatMessage(
 ) {
   if (!io) return;
   const payload = { sessionId, message, session };
+  // Emit once to the chat room (scanner + owner who joined the thread).
+  // Owner-wide notify uses emitIncomingChat / push — avoid double delivery on owner room.
   io.to(`chat:${sessionId}`).emit('chat:message', payload);
-  io.to(`owner:${ownerId}`).emit('chat:message', payload);
+  // Owners who have not joined the chat room still need live updates when a thread is open in another tab
+  io.to(`owner:${ownerId}`).except(`chat:${sessionId}`).emit('chat:message', payload);
 }
 
 export function emitChatSessionUpdate(ownerId: string, session: ChatSessionDto) {
   if (!io) return;
-  io.to(`owner:${ownerId}`).emit('chat:session', { session });
   io.to(`chat:${session.id}`).emit('chat:session', { session });
+  io.to(`owner:${ownerId}`).except(`chat:${session.id}`).emit('chat:session', { session });
 }
 
 export function emitIncomingChat(

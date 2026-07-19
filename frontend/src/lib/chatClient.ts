@@ -53,6 +53,18 @@ export type IncomingChat = {
   preview: string;
 };
 
+/** True when `next` is older than `prev` and should be ignored (stale poll). */
+export function isStaleChatSession(next: ChatSession, prev: ChatSession | null): boolean {
+  if (!prev || prev.id !== next.id) return false;
+  if (next.messages.length < prev.messages.length) return true;
+  if (next.messages.length > prev.messages.length) return false;
+  const prevLast = prev.messages[prev.messages.length - 1];
+  const nextLast = next.messages[next.messages.length - 1];
+  if (!prevLast || !nextLast) return false;
+  if (prevLast.id === nextLast.id) return false; // same tip — allow read-receipt updates
+  return new Date(nextLast.createdAt).getTime() < new Date(prevLast.createdAt).getTime();
+}
+
 const SCANNER_TOKEN_KEY = (sessionId: string) => `qrhorn-chat-token:${sessionId}`;
 const SCANNER_LAST_SEEN_KEY = (sessionId: string) => `qrhorn-chat-seen:${sessionId}`;
 const SCANNER_PENDING_KEY = 'qrhorn-scanner-pending-chat';

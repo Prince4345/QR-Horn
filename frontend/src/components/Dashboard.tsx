@@ -629,8 +629,13 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
   if (!selectedVehicle) return null;
 
   const handleMobileChatBack = () => {
-    closeOpenChat();
-    window.history.replaceState(null, '', '/?view=dashboard&tab=messages');
+    if (openSessionId) {
+      closeOpenChat();
+      window.history.replaceState(null, '', '/?view=dashboard&tab=messages');
+      return;
+    }
+    setTab('overview');
+    window.history.replaceState(null, '', '/?view=dashboard');
   };
 
   if (detailTab === 'messages') {
@@ -765,18 +770,6 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                   Overview
                 </button>
                 <button
-                  onClick={() => setTab('messages')}
-                  className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
-                    detailTab === 'messages' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Messages
-                  {sessions.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-brand text-[10px] font-bold text-white">{sessions.length}</span>
-                  )}
-                </button>
-                <button
                   onClick={() => setTab('vault')}
                   className={`px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2 shrink-0 ${
                     detailTab === 'vault' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'
@@ -826,46 +819,6 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
                   mode="medical"
                   onSaved={syncVehicle}
                 />
-              ) : detailTab === 'messages' ? (
-                <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
-                  <div className="lg:w-56 shrink-0 space-y-2 max-h-48 lg:max-h-none overflow-y-auto">
-                    {sessions.length === 0 ? (
-                      <p className="text-muted text-sm">No active chats.</p>
-                    ) : (
-                      sessions.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => void openChat(s.id, { navigate: false })}
-                          className={`w-full text-left p-3 rounded-xl border transition-colors ${
- openSessionId === s.id ? 'bg-soft border-line' : 'bg-surface border-line hover:bg-soft'
- }`}
-                        >
-                          <p className="text-sm font-medium truncate">{s.vehicleName}</p>
-                          <p className="text-[10px] font-mono text-muted truncate">{s.vehicleNumber}</p>
-                          {s.lastMessage && (
-                            <p className="text-xs text-muted mt-1 line-clamp-2">{s.lastMessage.body}</p>
-                          )}
-                          {s.readOnly && (
-                            <span className="text-[10px] text-amber-400 uppercase mt-1 inline-block">Read-only</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <div className="flex-1 min-h-[360px] bg-surface rounded-2xl p-4 border border-line">
-                    {openSessionId ? (
-                      <ChatPanel
-                        session={activeSession}
-                        loading={loadingSession}
-                        role="owner"
-                        onSend={sendOwnerMessage}
-                        onBlock={() => blockSession(openSessionId)}
-                      />
-                    ) : (
-                      <p className="text-muted text-sm text-center py-12">Select a conversation to reply.</p>
-                    )}
-                  </div>
-                </div>
               ) : (
               <>
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 sm:mb-8">
