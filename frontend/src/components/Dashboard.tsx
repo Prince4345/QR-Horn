@@ -693,7 +693,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
         </div>
       )}
 
-      <div className={`w-full grid grid-cols-1 lg:grid-cols-12 ${showSticker ? '' : 'lg:min-h-[calc(100dvh-4.5rem)]'}`}>
+      <div className={`w-full grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100dvh-4.5rem)]`}>
       <aside className={`lg:col-span-4 xl:col-span-3 flex-col border-b lg:border-b-0 lg:border-r border-line bg-surface ${showSticker ? 'hidden' : 'flex'}`}>
           <div className="px-5 sm:px-6 py-5 flex flex-wrap justify-between items-start gap-3 border-b border-line">
             <div>
@@ -958,7 +958,7 @@ function DashboardContent({ isActive = true, openChatSessionId, initialTab = 'ov
               </div>
             </motion.div>
           ) : (
-            <motion.div key="sticker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full flex flex-col px-4 sm:px-6 lg:px-8 py-6">
+            <motion.div key="sticker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-[calc(100dvh-5rem)] flex flex-col px-4 sm:px-6 lg:px-8 py-6 bg-canvas">
               {selectedVehicle.stickerCode ? (
                 <>
                   <StickerStudio

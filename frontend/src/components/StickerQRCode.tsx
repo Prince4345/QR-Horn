@@ -3,6 +3,7 @@ import { renderArtisticQr } from '../lib/artisticQr';
 import { renderFramedQr } from '../lib/qrFrames';
 import { getArtPreset, type QrArtStyle } from '../lib/qrArtStyles';
 import { BRAND_LOGO_LETTER } from '../lib/brand';
+import { getScanUrl } from '../lib/scanUrl';
 
 interface StickerQRCodeProps {
   code: string;
