@@ -215,28 +215,29 @@ export default function Dashboard({ isActive = true, openChatSessionId, initialT
     );
   }
 
-  // Signed in but profile incomplete → always show name/phone form (not a hard error)
+  // Signed in but profile incomplete → name/phone form
   if (session && !setupComplete) {
-    // Soft errors (e.g. old auto-setup 400) should not block the profile form
     if (authError && /backend|timed out|Could not reach|port 3001/i.test(authError)) {
       return (
-        <div className="w-full max-w-md text-center py-16 px-6">
-          <p className="text-brand mb-4">{authError}</p>
-          <p className="text-muted text-sm mb-6">
-            You are signed in, but we could not reach the server. Check that the site is awake and try again.
-          </p>
-          <button
-            onClick={() => {
-              clearAuthError();
-              refreshProfile();
-            }}
-            className="px-6 py-3 bg-brand rounded-xl font-semibold mr-3 text-white"
-          >
-            Retry
-          </button>
-          <button onClick={signOut} className="px-6 py-3 bg-soft rounded-xl">
-            Sign out
-          </button>
+        <div className="w-full min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-4.5rem)] flex items-center justify-center px-6">
+          <div className="w-full max-w-md text-center">
+            <p className="text-brand mb-4">{authError}</p>
+            <p className="text-muted text-sm mb-6">
+              You are signed in, but we could not reach the server. Check that the site is awake and try again.
+            </p>
+            <button
+              onClick={() => {
+                clearAuthError();
+                refreshProfile();
+              }}
+              className="px-6 py-3 bg-brand rounded-xl font-semibold mr-3 text-white"
+            >
+              Retry
+            </button>
+            <button onClick={signOut} className="px-6 py-3 bg-soft rounded-xl">
+              Sign out
+            </button>
+          </div>
         </div>
       );
     }

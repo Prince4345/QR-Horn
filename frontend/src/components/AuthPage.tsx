@@ -64,18 +64,20 @@ export default function AuthPage() {
 
   if (!isSupabaseConfigured) {
     return (
-      <div className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center">
-        <h2 className="text-xl font-semibold mb-2">Auth Not Configured</h2>
-        <p className="text-muted text-sm">
-          Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to frontend/.env
-        </p>
+      <div className="w-full min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-4.5rem)] flex items-center justify-center px-5">
+        <div className="w-full max-w-md text-center">
+          <h2 className="text-xl font-semibold mb-2">Auth Not Configured</h2>
+          <p className="text-muted text-sm">
+            Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to frontend/.env
+          </p>
+        </div>
       </div>
     );
   }
 
   if (authLoading || profileLoading) {
     return (
-      <div className="flex justify-center py-20">
+      <div className="w-full min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-4.5rem)] flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
@@ -154,11 +156,12 @@ export default function AuthPage() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-5 sm:p-8"
-    >
+    <div className="w-full min-h-[calc(100dvh-4rem)] sm:min-h-[calc(100dvh-4.5rem)] flex flex-col items-center justify-center bg-canvas px-4 py-6 sm:py-10">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md sm:max-w-lg flex flex-col justify-center px-5 py-8 sm:px-8 sm:py-10 rounded-none sm:rounded-[40px] sm:border sm:border-line sm:bg-surface sm:shadow-xl"
+      >
       <div className="text-center mb-8">
         <BrandLogo size="lg" glow className="mx-auto mb-4" />
         {needsSetup ? (
@@ -166,7 +169,7 @@ export default function AuthPage() {
         ) : (
           <BrandWordmark size="lg" className="justify-center mb-1 inline-flex" />
         )}
-        <p className="text-muted text-sm">
+        <p className="text-muted text-sm max-w-sm mx-auto">
           {needsSetup
             ? 'We need your name and mobile number to send SMS alerts when someone contacts your vehicle.'
             : 'Owner sign in — manage your vehicle stickers and alerts'}
@@ -191,7 +194,7 @@ export default function AuthPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Your full name"
               required
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
             />
           </div>
           <div className="relative">
@@ -202,7 +205,7 @@ export default function AuthPage() {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Mobile number (e.g. 9876543210)"
               required
-              className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+              className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
             />
           </div>
           <p className="text-xs text-faint text-center leading-relaxed">
@@ -213,7 +216,7 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading || !name.trim() || !phone.trim()}
-            className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
+            className="w-full py-3.5 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save & continue'}
           </button>
@@ -224,7 +227,7 @@ export default function AuthPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={loading}
-            className="w-full py-3 mb-4 bg-surface text-ink border border-line rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-soft transition-colors"
+            className="w-full py-3.5 mb-4 bg-surface text-ink border border-line rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-soft transition-colors"
           >
             <Chrome className="w-5 h-5" />
             Continue with Google
@@ -236,18 +239,18 @@ export default function AuthPage() {
             <div className="flex-1 h-px bg-soft" />
           </div>
 
-          <div className="flex mb-4 bg-surface rounded-full p-1">
+          <div className="flex mb-4 bg-soft/80 rounded-full p-1">
             <button
               type="button"
               onClick={() => { setAuthMethod('email'); setError(null); setPhoneStep('enter'); }}
-              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'email' ? 'bg-soft' : 'text-muted'}`}
+              className={`flex-1 py-2.5 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'email' ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}
             >
               <Mail className="w-3.5 h-3.5" /> Email
             </button>
             <button
               type="button"
               onClick={() => { setAuthMethod('phone'); setError(null); setPhoneStep('enter'); }}
-              className={`flex-1 py-2 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'phone' ? 'bg-soft' : 'text-muted'}`}
+              className={`flex-1 py-2.5 rounded-full text-sm font-medium flex items-center justify-center gap-1 ${authMethod === 'phone' ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}
             >
               <Phone className="w-3.5 h-3.5" /> Phone
             </button>
@@ -255,18 +258,18 @@ export default function AuthPage() {
 
           {authMethod === 'email' ? (
             <>
-              <div className="flex mb-4 bg-surface rounded-full p-1">
+              <div className="flex mb-4 bg-soft/80 rounded-full p-1">
                 <button
                   type="button"
                   onClick={() => setMode('login')}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'login' ? 'bg-soft' : 'text-muted'}`}
+                  className={`flex-1 py-2.5 rounded-full text-sm font-medium ${mode === 'login' ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode('signup')}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium ${mode === 'signup' ? 'bg-soft' : 'text-muted'}`}
+                  className={`flex-1 py-2.5 rounded-full text-sm font-medium ${mode === 'signup' ? 'bg-surface text-ink shadow-sm' : 'text-muted'}`}
                 >
                   Sign Up
                 </button>
@@ -282,7 +285,7 @@ export default function AuthPage() {
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Your full name"
                         required
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                        className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                       />
                     </div>
                     <div className="relative">
@@ -293,7 +296,7 @@ export default function AuthPage() {
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="Mobile number (for SMS alerts)"
                         required
-                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                        className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                       />
                     </div>
                   </>
@@ -306,7 +309,7 @@ export default function AuthPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email"
                     required
-                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                   />
                 </div>
                 <div className="relative">
@@ -318,7 +321,7 @@ export default function AuthPage() {
                     placeholder="Password"
                     required
                     minLength={6}
-                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                    className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                   />
                 </div>
                 {error && <p className="text-brand text-sm">{error}</p>}
@@ -326,7 +329,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={loading || (mode === 'signup' && (!name.trim() || !phone.trim()))}
-                  className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
+                  className="w-full py-3.5 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'signup' ? 'Create Account' : 'Sign In'}
                 </button>
@@ -342,7 +345,7 @@ export default function AuthPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Phone number (e.g. 9876543210)"
                   required
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50"
                 />
               </div>
               <p className="text-xs text-faint text-center">
@@ -352,7 +355,7 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={loading || !phone.trim()}
-                className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
+                className="w-full py-3.5 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send OTP'}
               </button>
@@ -368,13 +371,13 @@ export default function AuthPage() {
                 placeholder="Enter 6-digit OTP"
                 required
                 maxLength={6}
-                className="w-full px-4 py-3 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50 text-center text-2xl tracking-[0.5em] font-mono"
+                className="w-full px-4 py-3.5 rounded-2xl bg-surface border border-line outline-none focus:border-brand/50 text-center text-2xl tracking-[0.5em] font-mono"
               />
               {error && <p className="text-brand text-sm">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full py-3 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
+                className="w-full py-3.5 bg-brand disabled:opacity-50 rounded-2xl font-semibold flex items-center justify-center gap-2 text-white"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & continue'}
               </button>
@@ -389,6 +392,7 @@ export default function AuthPage() {
           )}
         </>
       )}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

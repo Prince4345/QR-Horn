@@ -54,6 +54,13 @@ function formatPhoneE164(phone: string): string {
   return `+${digits}`;
 }
 
+/** True when the API rejected the JWT — not the same as "profile incomplete". */
+function isDeadSessionError(message: string): boolean {
+  return /invalid or expired token|missing authorization|unauthorized|jwt expired|session.*expired/i.test(
+    message,
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [owner, setOwner] = useState<OwnerProfile | null>(null);
@@ -81,9 +88,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPushEnabled(!!data.owner?.fcmToken);
       return data;
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load profile';
+      // Dead JWT must NOT look like "complete your profile"
+      if (isDeadSessionError(msg) && supabase) {
+        syncNativeAuthToken(null);
+        setSession(null);
+        setOwner(null);
+        setSetupComplete(false);
+        setPushEnabled(false);
+        setAuthError(null);
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        return null;
+      }
       setOwner(null);
       setSetupComplete(false);
-      setAuthError(err instanceof Error ? err.message : 'Failed to load profile');
+      setAuthError(msg);
       return null;
     }
   }, [session]);
@@ -159,6 +178,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const profile = await api.getMe().catch((err) => {
           if (!cancelled) {
             const msg = err instanceof Error ? err.message : '';
+            if (isDeadSessionError(msg)) {
+              // Stale session after logout on another device — clear and show Sign In
+              syncNativeAuthToken(null);
+              setSession(null);
+              setOwner(null);
+              setSetupComplete(false);
+              setPushEnabled(false);
+              setAuthError(null);
+              void supabase?.auth.signOut({ scope: 'local' }).catch(() => {});
+              return null;
+            }
             setAuthError(
               msg.includes('timed out') || /Failed to fetch|NetworkError/i.test(msg)
                 ? 'Could not reach the server. Wait a few seconds if the site is waking up, then tap Retry.'
@@ -170,8 +200,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
 
         if (!profile) {
-          setSetupComplete(false);
-          setOwner(null);
+          // Only mark incomplete when we still have a live session (handled above for 401)
+          if (sessionRef.current) {
+            setSetupComplete(false);
+            setOwner(null);
+          }
           return;
         }
 
@@ -270,11 +303,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     if (!supabase) return;
-    await supabase.auth.signOut();
+    // Local only — signing out on laptop must NOT kick the phone off
+    await supabase.auth.signOut({ scope: 'local' });
     syncNativeAuthToken(null);
     setSession(null);
     setOwner(null);
     setSetupComplete(false);
+    setAuthError(null);
+    setPushEnabled(false);
   };
 
   const ensureFirebaseConfig = useCallback(async (): Promise<FirebasePublicConfig> => {
