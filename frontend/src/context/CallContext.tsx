@@ -61,6 +61,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (incomingCallRef.current && incomingCallRef.current.roomId !== call.roomId) return;
     setIncomingCall(call);
     setCallPhase('ringing');
+    // Heads-up when app is backgrounded / screen off (FCM also fires; this covers socket path)
+    if (document.visibilityState !== 'visible') {
+      void import('../lib/alertNotify').then(({ showOsNotification }) =>
+        showOsNotification({
+          title: 'Incoming call',
+          body: `${call.vehicleName} · ${call.vehicleNumber} — tap to answer`,
+          kind: 'call',
+          roomId: call.roomId,
+          url: `/?view=dashboard&call=${encodeURIComponent(call.roomId)}`,
+        }),
+      );
+    }
   }, []);
 
   // Ring + vibrate while an incoming call is waiting

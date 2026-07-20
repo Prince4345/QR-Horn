@@ -36,10 +36,12 @@ function showCallOrAlert(data) {
     },
     actions: isCall
       ? [
-          { action: 'answer', title: '✅ Answer' },
-          { action: 'decline', title: '✖️ Decline' },
+          { action: 'answer', title: 'Answer' },
+          { action: 'decline', title: 'Decline' },
         ]
-      : [],
+      : isChat
+        ? [{ action: 'open', title: 'Open' }]
+        : [],
   });
 }
 

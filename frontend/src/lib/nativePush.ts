@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type ActionPerformed, type PushNotificationSchema, type Token } from '@capacitor/push-notifications';
+import { showOsNotification } from './alertNotify';
 
 export const PUSH_CHANNEL_CALLS = 'parkstag_calls';
 export const PUSH_CHANNEL_MESSAGES = 'parkstag_messages';
@@ -61,6 +62,20 @@ function handleNotification(notification: PushNotificationSchema) {
   const data = asDataRecord(notification.data);
   if (!data.title && notification.title) data.title = notification.title;
   if (!data.body && notification.body) data.body = notification.body;
+
+  // Foreground: FCM does not show a tray banner — show WhatsApp-style heads-up
+  if (document.visibilityState === 'visible' && (data.title || data.body)) {
+    const kind = data.kind === 'call' || data.kind === 'chat' ? data.kind : 'notify';
+    void showOsNotification({
+      title: data.title || 'ParksTAG',
+      body: data.body || 'New alert',
+      kind,
+      url: data.url,
+      sessionId: data.sessionId,
+      roomId: data.roomId,
+    });
+  }
+
   handleNativePushData(data);
 }
 

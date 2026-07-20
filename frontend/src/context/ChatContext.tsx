@@ -100,6 +100,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [owner?.id]);
 
   const showIncoming = useCallback((chat: IncomingChat) => {
+    const viewingThis = openSessionIdRef.current === chat.sessionId;
+    // WhatsApp-style OS notification when not already inside that chat
+    if (!viewingThis) {
+      void import('../lib/alertNotify').then(({ showOsNotification }) =>
+        showOsNotification({
+          title: chat.vehicleName || 'New message',
+          body: chat.preview,
+          kind: 'chat',
+          sessionId: chat.sessionId,
+          url: `/?view=dashboard&chat=${encodeURIComponent(chat.sessionId)}`,
+        }),
+      );
+    }
     if (!shouldShowPopup(chat.sessionId, dismissedRef.current, openSessionIdRef.current)) return;
     setIncomingChat(chat);
     playMessageSound();

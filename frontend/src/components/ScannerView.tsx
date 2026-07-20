@@ -37,7 +37,6 @@ import {
   loadPendingScannerChat,
   loadScannerLastSeen,
   loadScannerToken,
-  notifyScannerOwnerReply,
   requestScannerNotificationPermission,
   savePendingScannerChat,
   saveScannerLastSeen,
@@ -150,13 +149,18 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
 
     setOwnerReplyBanner({ preview: latest.body, count: unread });
 
-    if (document.hidden) {
-      notifyScannerOwnerReply({
-        sessionId: session.id,
-        vehicleName: session.vehicleName,
-        preview: latest.body,
-        url: buildChatUrl(session.id),
-      });
+    // WhatsApp-style notify when chat drawer is closed (background or other screen)
+    if (!chatOpenRef.current) {
+      void import('../lib/alertNotify').then(({ showOsNotification }) =>
+        showOsNotification({
+          title: `${session.vehicleName} replied`,
+          body: latest.body,
+          kind: 'chat',
+          sessionId: session.id,
+          url: buildChatUrl(session.id),
+        }),
+      );
+      if (fromOwnerMessage && !document.hidden) playMessageSound();
     } else if (fromOwnerMessage) {
       playMessageSound();
     }

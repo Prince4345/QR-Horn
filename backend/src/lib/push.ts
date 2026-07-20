@@ -68,10 +68,22 @@ function androidChannelId(kind: string | undefined): string {
   return 'parkstag_alerts';
 }
 
-function androidNotificationTag(kind: string | undefined): string {
-  if (kind === 'call') return 'qrhorn-call';
-  if (kind === 'chat') return 'qrhorn-chat';
+function androidNotificationTag(data: Record<string, string>): string {
+  if (data.kind === 'call') {
+    return data.roomId ? `qrhorn-call-${data.roomId}` : 'qrhorn-call';
+  }
+  if (data.kind === 'chat') {
+    return data.sessionId ? `qrhorn-chat-${data.sessionId}` : 'qrhorn-chat';
+  }
   return 'qrhorn-alert';
+}
+
+function appPublicBase(): string {
+  const keep = process.env.KEEP_ALIVE_URL?.trim()?.replace(/\/$/, '');
+  if (keep) return keep;
+  const cors = process.env.CORS_ORIGIN?.split(',')[0]?.trim()?.replace(/\/$/, '');
+  if (cors?.startsWith('http')) return cors;
+  return '';
 }
 
 async function sendDataToOwnerDevices(
@@ -114,7 +126,7 @@ async function sendDataToOwnerDevices(
             defaultVibrateTimings: true,
             priority: isCall ? 'max' : 'high',
             visibility: 'public',
-            tag: androidNotificationTag(data.kind),
+            tag: androidNotificationTag(data),
           },
         },
         ...(webNotification
@@ -127,7 +139,7 @@ async function sendDataToOwnerDevices(
                 notification: {
                   title: webNotification.title,
                   body: webNotification.body,
-                  tag: androidNotificationTag(data.kind),
+                  tag: androidNotificationTag(data),
                   requireInteraction: isCall,
                 },
                 ...(webNotification.link ? { fcmOptions: { link: webNotification.link } } : {}),
@@ -167,16 +179,17 @@ export async function sendPushToOwner(
   }
 ): Promise<boolean> {
   const isCall = payload.kind === 'call';
+  // WhatsApp-style: short title + clear body
   const title = isCall
-    ? `📞 Incoming call — ${payload.vehicleName}`
+    ? 'Incoming call'
     : payload.theftMode
-      ? '⚠ Theft Alert'
-      : 'Vehicle Contact';
+      ? 'Theft alert'
+      : 'Vehicle alert';
   const body = isCall
-    ? `Someone at ${payload.vehicleNumber} wants to talk. Tap to answer.`
+    ? `${payload.vehicleName} · ${payload.vehicleNumber} — tap to answer`
     : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
-  const appBase = process.env.KEEP_ALIVE_URL?.trim()?.replace(/\/$/, '') ?? '';
+  const appBase = appPublicBase();
   const relativeUrl =
     isCall && payload.roomId
       ? `/?view=dashboard&call=${encodeURIComponent(payload.roomId)}`
@@ -190,19 +203,17 @@ export async function sendPushToOwner(
   };
   if (payload.roomId) data.roomId = payload.roomId;
 
-  // Calls: webpush notification + Android tray. Notify alerts: data-only for web
-  // (SW displays once); Android still gets a tray notification from data title/body.
-  const result = await sendDataToOwnerDevices(
-    ownerId,
-    data,
-    isCall ? 60 : 3600,
-    isCall ? { title, body, link: appBase ? `${appBase}${relativeUrl}` : undefined } : undefined
-  );
+  // Always include notification payload so Android/web show a tray alert (like WhatsApp)
+  const result = await sendDataToOwnerDevices(ownerId, data, isCall ? 60 : 3600, {
+    title,
+    body,
+    link: appBase ? `${appBase}${relativeUrl}` : undefined,
+  });
 
   return result.sent > 0;
 }
 
-/** Push when a scanner sends a chat message (no SMS). */
+/** Push when a scanner sends a chat message (WhatsApp-style message notification). */
 export async function sendChatMessagePush(
   ownerId: string,
   payload: {
@@ -212,10 +223,10 @@ export async function sendChatMessagePush(
     preview: string;
   }
 ): Promise<boolean> {
-  const title = `💬 ${payload.vehicleName}`;
+  const title = payload.vehicleName || payload.vehicleNumber || APP_NAME;
   const body =
-    payload.preview.length > 80 ? `${payload.preview.slice(0, 77)}…` : payload.preview;
-  const appBase = process.env.KEEP_ALIVE_URL?.trim()?.replace(/\/$/, '') ?? '';
+    payload.preview.length > 120 ? `${payload.preview.slice(0, 117)}…` : payload.preview;
+  const appBase = appPublicBase();
   const relativeUrl = `/?view=dashboard&chat=${encodeURIComponent(payload.sessionId)}`;
 
   const data: Record<string, string> = {
@@ -226,12 +237,11 @@ export async function sendChatMessagePush(
     sessionId: payload.sessionId,
   };
 
-  const result = await sendDataToOwnerDevices(
-    ownerId,
-    data,
-    3600,
-    { title, body, link: appBase ? `${appBase}${relativeUrl}` : undefined }
-  );
+  const result = await sendDataToOwnerDevices(ownerId, data, 3600, {
+    title,
+    body,
+    link: appBase ? `${appBase}${relativeUrl}` : undefined,
+  });
 
   return result.sent > 0;
 }

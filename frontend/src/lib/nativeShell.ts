@@ -3,6 +3,7 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { App as CapApp } from '@capacitor/app';
 import { bindNativePushHandlers, ensureNativePushChannels } from './nativePush';
+import { initLocalNotificationTaps } from './alertNotify';
 
 /** Native shell polish — safe no-op in the browser. */
 export async function initNativeShell(): Promise<void> {
@@ -25,6 +26,7 @@ export async function initNativeShell(): Promise<void> {
   try {
     await ensureNativePushChannels();
     await bindNativePushHandlers();
+    await initLocalNotificationTaps();
   } catch {
     // Push plugin unavailable until google-services.json is present
   }
