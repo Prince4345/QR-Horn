@@ -17,7 +17,8 @@ import java.util.Map;
 
 /** Builds WhatsApp-style call + chat notifications (full-screen call, inline reply). */
 public final class ParkstagNotificationHelper {
-    public static final String CHANNEL_CALLS = "parkstag_calls";
+    /** Fresh channel id — Android never raises importance on an existing channel. */
+    public static final String CHANNEL_CALLS = "parkstag_calls_v2";
     public static final String CHANNEL_MESSAGES = "parkstag_messages";
     public static final String CHANNEL_ALERTS = "parkstag_alerts";
 
@@ -42,10 +43,14 @@ public final class ParkstagNotificationHelper {
         if (nm == null) return;
 
         NotificationChannel calls =
-                new NotificationChannel(CHANNEL_CALLS, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
+                new NotificationChannel(
+                        CHANNEL_CALLS, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
         calls.setDescription("Phone-style alerts when someone calls about your vehicle");
         calls.enableVibration(true);
+        calls.setVibrationPattern(new long[] {0, 800, 400, 800, 400, 800});
+        calls.enableLights(true);
         calls.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+        calls.setBypassDnd(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             calls.setAllowBubbles(true);
         }
@@ -115,9 +120,13 @@ public final class ParkstagNotificationHelper {
                         decline,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        // Full-screen intent: rings over lock screen like a phone call (when OS allows)
-        Intent fullScreen = openAppIntent(context, url, "call", roomId, null);
-        fullScreen.putExtra("fullScreenCall", true);
+        // Native full-screen ringing UI over the lock screen
+        Intent fullScreen = new Intent(context, IncomingCallActivity.class);
+        fullScreen.putExtra(IncomingCallActivity.EXTRA_TITLE, title);
+        fullScreen.putExtra(IncomingCallActivity.EXTRA_BODY, body);
+        fullScreen.putExtra(IncomingCallActivity.EXTRA_ROOM_ID, roomId);
+        fullScreen.putExtra(IncomingCallActivity.EXTRA_URL, url);
+        fullScreen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent fullScreenPi =
                 PendingIntent.getActivity(
                         context,
@@ -136,16 +145,24 @@ public final class ParkstagNotificationHelper {
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setOngoing(true)
                         .setAutoCancel(false)
-                        .setTimeoutAfter(60_000)
+                        .setTimeoutAfter(120_000)
                         .setContentIntent(contentPi)
                         .setFullScreenIntent(fullScreenPi, true)
                         .addAction(0, "Answer", answerPi)
                         .addAction(0, "Decline", declinePi)
                         .setColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
-                        .setDefaults(NotificationCompat.DEFAULT_ALL);
+                        .setDefaults(NotificationCompat.DEFAULT_ALL)
+                        .setVibrate(new long[] {0, 800, 400, 800, 400, 800});
 
         NotificationManager nm = context.getSystemService(NotificationManager.class);
         if (nm != null) nm.notify(notifyId, builder.build());
+
+        // Also try launching the ringing UI immediately when the process is awake
+        try {
+            context.startActivity(fullScreen);
+        } catch (Exception ignored) {
+            // fullScreenIntent / heads-up still covers lock screen when allowed
+        }
     }
 
     private static void showChat(Context context, Map<String, String> data) {

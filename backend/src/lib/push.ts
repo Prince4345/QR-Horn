@@ -76,7 +76,8 @@ function isAndroidNativeDevice(device: string): boolean {
 }
 
 function androidChannelId(kind: string | undefined): string {
-  if (kind === 'call') return 'parkstag_calls';
+  // v2 call channel — older parkstag_calls may be stuck at low importance on devices
+  if (kind === 'call') return 'parkstag_calls_v2';
   if (kind === 'chat') return 'parkstag_messages';
   return 'parkstag_alerts';
 }
@@ -125,29 +126,33 @@ async function sendDataToOwnerDevices(
     try {
       const androidNative = isAndroidNativeDevice(device);
 
-      // Android native app builds its own tray UI (caller name, Reply, full-screen call).
-      // Data-only ensures onMessageReceived runs even when the app is backgrounded/killed.
-      // Web/browser tokens keep a system notification + webpush.
+      // Calls ALWAYS include a system notification tray payload — even for android-native.
+      // Data-only FCM is often held by Doze/OEM until the app is opened (the bug users hit).
+      // Chat on android-native stays data-only so MessagingService can build Reply UI.
+      const useSystemTray = isCall || !androidNative;
+
       await admin.messaging().send({
         token,
         data,
         android: {
           priority: 'high',
           ttl: ttlSeconds * 1000,
-          ...(androidNative
-            ? {}
-            : {
+          ...(useSystemTray
+            ? {
                 notification: {
                   title,
                   body,
                   channelId: androidChannelId(data.kind),
                   sound: 'default',
                   defaultVibrateTimings: true,
+                  defaultSound: true,
                   priority: isCall ? 'max' : 'high',
                   visibility: 'public',
                   tag: androidNotificationTag(data),
+                  ...(isCall ? { sticky: true } : {}),
                 },
-              }),
+              }
+            : {}),
         },
         ...(webNotification
           ? {
@@ -230,7 +235,9 @@ export async function sendPushToOwner(
   if (payload.roomId) data.roomId = payload.roomId;
   if (caller) data.callerName = caller;
 
-  const result = await sendDataToOwnerDevices(ownerId, data, isCall ? 60 : 3600, {
+  // Call TTL was 60s — Doze often delays delivery longer, so FCM dropped the push
+  // before the phone ever showed it. Keep for the typical ring window (~5 min).
+  const result = await sendDataToOwnerDevices(ownerId, data, isCall ? 300 : 3600, {
     title,
     body,
     link: appBase ? `${appBase}${relativeUrl}` : undefined,

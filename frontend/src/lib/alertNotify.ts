@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
-const CHANNEL_CALLS = 'parkstag_calls';
+const CHANNEL_CALLS = 'parkstag_calls_v2';
 const CHANNEL_MESSAGES = 'parkstag_messages';
 const CHANNEL_ALERTS = 'parkstag_alerts';
 

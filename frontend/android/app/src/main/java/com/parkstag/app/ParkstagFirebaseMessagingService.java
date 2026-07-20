@@ -1,5 +1,7 @@
 package com.parkstag.app;
 
+import android.os.PowerManager;
+
 import androidx.annotation.NonNull;
 
 import com.capacitorjs.plugins.pushnotifications.PushNotificationsPlugin;
@@ -10,27 +12,48 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Receives data-only FCM and posts WhatsApp-style tray notifications even when the app is killed.
- * Still forwards to Capacitor so the WebView can ring / open chat when it is alive.
+ * Receives FCM and posts call/chat tray UI. For calls with a system notification payload,
+ * Android may deliver only when the app is in the foreground — the system tray still shows
+ * the FCM notification when the app is killed.
  */
 public class ParkstagFirebaseMessagingService extends FirebaseMessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        Map<String, String> data = remoteMessage.getData();
-        if (data != null && !data.isEmpty()) {
-            // Always show a native tray notification for background/killed reliability.
-            // Foreground also gets Capacitor → local notify; duplicate tags replace each other.
-            ParkstagNotificationHelper.showFromPushData(this, new HashMap<>(data));
-        } else if (remoteMessage.getNotification() != null) {
-            Map<String, String> fallback = new HashMap<>();
-            fallback.put("title", remoteMessage.getNotification().getTitle());
-            fallback.put("body", remoteMessage.getNotification().getBody());
-            fallback.put("kind", "notify");
-            ParkstagNotificationHelper.showFromPushData(this, fallback);
+        PowerManager.WakeLock wakeLock = null;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null) {
+                wakeLock =
+                        pm.newWakeLock(
+                                PowerManager.PARTIAL_WAKE_LOCK, "parkstag:fcm");
+                wakeLock.acquire(15_000);
+            }
+
+            Map<String, String> data = new HashMap<>();
+            if (remoteMessage.getData() != null) {
+                data.putAll(remoteMessage.getData());
+            }
+            if (remoteMessage.getNotification() != null) {
+                if (!data.containsKey("title") && remoteMessage.getNotification().getTitle() != null) {
+                    data.put("title", remoteMessage.getNotification().getTitle());
+                }
+                if (!data.containsKey("body") && remoteMessage.getNotification().getBody() != null) {
+                    data.put("body", remoteMessage.getNotification().getBody());
+                }
+            }
+            if (!data.isEmpty()) {
+                ParkstagNotificationHelper.showFromPushData(this, data);
+            }
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                try {
+                    wakeLock.release();
+                } catch (Exception ignored) {
+                }
+            }
         }
 
-        // Keep Capacitor JS listeners in sync when the bridge is running
         PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
     }
 

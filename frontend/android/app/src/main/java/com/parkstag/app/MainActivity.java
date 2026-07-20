@@ -1,7 +1,11 @@
 package com.parkstag.app;
 
+import android.app.NotificationManager;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 
@@ -90,6 +94,50 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void clearAuth() {
             ParkstagAuthStore.clear(MainActivity.this);
+        }
+
+        /** Android 14+: open system screen to allow full-screen incoming-call UI. */
+        @JavascriptInterface
+        public void openFullScreenIntentSettings() {
+            runOnUiThread(
+                    () -> {
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                NotificationManager nm = getSystemService(NotificationManager.class);
+                                if (nm != null && nm.canUseFullScreenIntent()) {
+                                    return;
+                                }
+                                Intent intent =
+                                        new Intent(
+                                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                                                Uri.parse("package:" + getPackageName()));
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(intent);
+                            }
+                        } catch (Exception ignored) {
+                            try {
+                                Intent fallback =
+                                        new Intent(
+                                                Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                                .putExtra(
+                                                        Settings.EXTRA_APP_PACKAGE, getPackageName());
+                                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(fallback);
+                            } catch (Exception ignored2) {
+                            }
+                        }
+                    });
+        }
+
+        @JavascriptInterface
+        public boolean canUseFullScreenIntent() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true;
+            try {
+                NotificationManager nm = getSystemService(NotificationManager.class);
+                return nm != null && nm.canUseFullScreenIntent();
+            } catch (Exception e) {
+                return false;
+            }
         }
     }
 }

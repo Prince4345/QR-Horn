@@ -30,7 +30,31 @@ if (-not $env:VITE_APP_URL -or $env:VITE_APP_URL -match "localhost") {
   Write-Host "WARNING: VITE_APP_URL should be your live HTTPS URL for a phone build."
 }
 
-npm run build
+# Prefer `dist`. If Windows has it locked (common with Android Studio), use `dist-android`.
+$outDir = "dist"
+$distPath = Join-Path $root "dist"
+$locked = $false
+if (Test-Path $distPath) {
+  try {
+    $probe = Join-Path $distPath ".write-probe"
+    [IO.File]::WriteAllText($probe, "ok")
+    Remove-Item $probe -Force -ErrorAction Stop
+    # Also try clearing assets (the usual EBUSY target)
+    $assets = Join-Path $distPath "assets"
+    if (Test-Path $assets) {
+      Remove-Item $assets -Recurse -Force -ErrorAction Stop
+    }
+  } catch {
+    $locked = $true
+    Write-Host "NOTE: dist/ is locked (close Android Studio / File Explorer on dist if open)."
+    Write-Host "Building to dist-android instead..."
+    $outDir = "dist-android"
+  }
+}
+
+$env:CAPACITOR_WEB_DIR = $outDir
+
+npx vite build --outDir $outDir --emptyOutDir
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 npx cap sync android

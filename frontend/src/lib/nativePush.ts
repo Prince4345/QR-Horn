@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, type ActionPerformed, type PushNotificationSchema, type Token } from '@capacitor/push-notifications';
 
-export const PUSH_CHANNEL_CALLS = 'parkstag_calls';
+export const PUSH_CHANNEL_CALLS = 'parkstag_calls_v2';
 export const PUSH_CHANNEL_MESSAGES = 'parkstag_messages';
 export const PUSH_CHANNEL_ALERTS = 'parkstag_alerts';
 

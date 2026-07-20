@@ -180,7 +180,10 @@ After rebuild, the native app should:
 
 If calls still do not pop over the lock screen on Android 14+:
 
-**Settings → Apps → ParksTAG → Notifications → Incoming calls** — importance High, and allow full-screen / lock screen.
+1. **Settings → Apps → ParksTAG → Notifications → Incoming calls** — importance High / lock screen
+2. Allow **Full screen intents** when the app prompts (or Apps → ParksTAG → Special app access)
+3. Disable battery optimization for ParksTAG (Settings → Apps → ParksTAG → Battery → Unrestricted)
+4. Redeploy backend + rebuild the app after call-notification fixes (system tray push + 5‑min FCM TTL)
 
 ## Play Store (later)
 

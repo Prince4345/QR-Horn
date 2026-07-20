@@ -4,6 +4,8 @@ import { getApiBase } from './apiBase';
 type ParkstagNative = {
   saveAuth: (accessToken: string, apiBase: string) => void;
   clearAuth: () => void;
+  openFullScreenIntentSettings?: () => void;
+  canUseFullScreenIntent?: () => boolean;
 };
 
 function nativeBridge(): ParkstagNative | null {
@@ -24,6 +26,21 @@ export function syncNativeAuthToken(accessToken: string | null | undefined): voi
     }
   } catch {
     // WebView bridge not ready yet
+  }
+}
+
+/** Prompt once for Android 14+ full-screen call permission (lock-screen ringing). */
+export function ensureFullScreenCallPermission(): void {
+  const bridge = nativeBridge();
+  if (!bridge?.openFullScreenIntentSettings || !bridge.canUseFullScreenIntent) return;
+  try {
+    if (bridge.canUseFullScreenIntent()) return;
+    const key = 'parkstag-fsi-asked';
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    bridge.openFullScreenIntentSettings();
+  } catch {
+    // ignore
   }
 }
 

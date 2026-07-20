@@ -14,7 +14,8 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL?.trim();
 const config: CapacitorConfig = {
   appId: 'com.parkstag.app',
   appName: 'ParksTAG',
-  webDir: 'dist',
+  // android-sync.ps1 builds to dist-android when `dist` is locked (Android Studio / AV)
+  webDir: process.env.CAPACITOR_WEB_DIR?.trim() || 'dist',
   server: {
     androidScheme: 'https',
     // Allow http:// during local LAN testing if needed
