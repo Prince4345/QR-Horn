@@ -40,6 +40,12 @@ So `https://qr-horn.onrender.com/auth/native-callback` serves the app-open bridg
 
 Phone OTP stays inside the app — enter the SMS **code**. If Captcha is enabled in Supabase Auth, turn it off for testing (it often breaks in the app).
 
+### Signed in but “Could not reach the server”
+
+The Android WebView origin is `https://localhost`. The backend must allow that in CORS (shipped automatically). If you set `CORS_ORIGIN` on Render, you do **not** need to add localhost yourself anymore — Capacitor origins are always merged in.
+
+Also wait for Render to finish deploying after a push; free tier may take ~30–60s to wake on first request — tap **Retry**.
+
 ## One-time setup
 
 ```bash

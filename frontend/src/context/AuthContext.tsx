@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, ty
 import type { Session, User } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { api, setAuthTokenGetter } from '../lib/api';
+import { api, setAuthTokenGetter, waitForApiReady } from '../lib/api';
 import { requestFcmToken, initFirebaseMessaging, type FirebasePublicConfig } from '../lib/firebase';
 import {
   bindNativePushHandlers,
@@ -139,12 +139,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setProfileLoading(true);
 
+    // Render free tier cold start can exceed 12s; native needs longer
     const profileTimeout = setTimeout(() => {
       if (!cancelled) setProfileLoading(false);
-    }, 12000);
+    }, Capacitor.isNativePlatform() ? 90000 : 20000);
 
     (async () => {
       try {
+        // Wake API before profile fetch (CORS + cold start)
+        await waitForApiReady(
+          Capacitor.isNativePlatform() ? 12 : 8,
+          Capacitor.isNativePlatform() ? 2500 : 500,
+        );
+        if (cancelled) return;
+
         const profile = await api.getMe().catch((err) => {
           if (!cancelled) {
             const msg = err instanceof Error ? err.message : '';

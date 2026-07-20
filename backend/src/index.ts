@@ -13,18 +13,15 @@ import { prisma } from './lib/prisma.js';
 import { initSocketServer } from './socket.js';
 import { runChatCleanup } from './lib/chatSessions.js';
 import { APP_NAME } from './lib/brand.js';
+import { resolveCorsOrigins } from './lib/corsOrigins.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const isProd = process.env.NODE_ENV === 'production';
-const CORS_ORIGIN =
-  process.env.CORS_ORIGIN ?? (isProd ? '' : 'http://localhost:3000');
 
 app.set('trust proxy', 1);
-const corsOrigins = CORS_ORIGIN
-  ? CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
-  : true;
-app.use(cors({ origin: corsOrigins }));
+const corsOrigins = resolveCorsOrigins(isProd);
+app.use(cors({ origin: corsOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
 if (!isProd) {

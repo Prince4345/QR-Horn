@@ -6,12 +6,13 @@ export function setAuthTokenGetter(fn: () => Promise<string | null>) {
   getAccessToken = fn;
 }
 
-/** Wait until Vite can reach the backend (avoids proxy errors right after npm run dev). */
+/** Wait until the API responds (dev proxy warm-up or Render cold start). */
 export async function waitForApiReady(maxAttempts = 20, delayMs = 500): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2000);
+      // Render free tier can take 30–60s to wake; allow longer per attempt
+      const timeout = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${getApiBase()}/api/health`, { signal: controller.signal });
       clearTimeout(timeout);
       if (res.ok) return true;

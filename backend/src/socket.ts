@@ -20,6 +20,7 @@ import {
 } from './lib/callSignaling.js';
 import type { ChatMessageDto, ChatSessionDto } from './lib/chatSessions.js';
 import { prisma } from './lib/prisma.js';
+import { resolveCorsOrigins } from './lib/corsOrigins.js';
 
 let io: Server | null = null;
 
@@ -30,13 +31,11 @@ type JoinAck = {
 };
 
 export function initSocketServer(httpServer: HttpServer) {
-  const corsEnv = process.env.CORS_ORIGIN?.trim();
-  const origins = corsEnv
-    ? corsEnv.split(',').map((o) => o.trim()).filter(Boolean)
-    : true;
+  const isProd = process.env.NODE_ENV === 'production';
+  const origins = resolveCorsOrigins(isProd);
 
   io = new Server(httpServer, {
-    cors: { origin: origins, methods: ['GET', 'POST'] },
+    cors: { origin: origins, methods: ['GET', 'POST'], credentials: true },
     pingTimeout: 30000,
     pingInterval: 15000,
   });
