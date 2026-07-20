@@ -8,6 +8,7 @@ This wraps the React web app in a native Android shell so you can run it on a ph
 2. Node.js 20+ (already used for this project)
 3. Your **live** ParksTAG URL (Render / custom domain) — phones cannot use `localhost`
 4. Firebase project (same one as web push) for native FCM
+5. Download `google-services.json` from Firebase Console → Project settings → Your apps, and place it at `frontend/android/app/google-services.json`. **Do not commit this file** (it is gitignored).
 
 ## Login (Google + phone) — required Supabase settings
 
