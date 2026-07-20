@@ -37,6 +37,7 @@ type ScannerLandingPageProps = {
   landingUnreadCount: number;
   ownerReplyBanner: { preview: string } | null;
   resumeLandingChat: () => void | Promise<void>;
+  endLandingChat: () => void | Promise<void>;
   onOpenJoin?: () => void;
 };
 
@@ -102,6 +103,7 @@ export default function ScannerLandingPage({
   landingUnreadCount,
   ownerReplyBanner,
   resumeLandingChat,
+  endLandingChat,
   onOpenJoin,
 }: ScannerLandingPageProps) {
   const { session, setupComplete } = useAuth();
@@ -170,14 +172,24 @@ export default function ScannerLandingPage({
                           </span>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void resumeLandingChat()}
-                        disabled={landingChatLoading}
-                        className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
-                      >
-                        Open chat
-                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void endLandingChat()}
+                          disabled={landingChatLoading}
+                          className="rounded-full border border-line px-3 py-2 text-sm font-medium text-muted hover:text-ink disabled:opacity-50"
+                        >
+                          End chat
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void resumeLandingChat()}
+                          disabled={landingChatLoading}
+                          className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
+                        >
+                          Open chat
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>

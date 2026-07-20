@@ -384,6 +384,12 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ token, body, isQuickReply }) }
     ),
 
+  leaveScannerChat: (sessionId: string, token: string) =>
+    request<{ success: boolean }>(`/api/chat/scanner/${encodeURIComponent(sessionId)}/leave`, {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
   getChatSessions: () => request<import('./chatClient').ChatSessionSummary[]>('/api/chat/sessions'),
 
   getChatSession: (sessionId: string, opts?: { markRead?: boolean }) => {

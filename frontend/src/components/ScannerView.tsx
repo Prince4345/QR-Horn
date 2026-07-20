@@ -32,6 +32,7 @@ import {
   getLatestOwnerMessage,
   isStaleChatSession,
   joinChatAsScanner,
+  clearScannerChatLocal,
   loadPendingScannerChat,
   loadScannerLastSeen,
   loadScannerToken,
@@ -192,6 +193,31 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     setLandingChatRestore(null);
     lastSeenRef.current = null;
   };
+
+  /** Anonymous scanner: end chat, clear resume sticky state + URL. */
+  const endScannerChat = useCallback(async () => {
+    const sessionId = chatSessionIdRef.current ?? chatSessionId;
+    const token = scannerToken ?? (sessionId ? loadScannerToken(sessionId) : null);
+    if (sessionId && token) {
+      try {
+        await api.leaveScannerChat(sessionId, token);
+      } catch {
+        // still clear local so the user isn't stuck
+      }
+    }
+    clearScannerChatLocal(sessionId);
+    setChatOpen(false);
+    setChatSession(null);
+    setChatSessionId(null);
+    setScannerToken(null);
+    setOwnerReplyBanner(null);
+    setLandingChatRestore(null);
+    lastSeenRef.current = null;
+    setLastSeenAt(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chat');
+    window.history.replaceState(null, '', url.pathname + url.search || '/');
+  }, [chatSessionId, scannerToken]);
 
   const attachChatSession = (
     sessionId: string,
@@ -383,6 +409,19 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
       .getScannerChat(sessionId, token)
       .then((session) => {
         if (cancelled) return;
+        // Dead sessions should not keep offering “resume”
+        if (session.status === 'CLOSED' || session.status === 'BLOCKED' || session.readOnly) {
+          clearScannerChatLocal(sessionId);
+          setChatSession(null);
+          setChatSessionId(null);
+          setScannerToken(null);
+          setLandingChatRestore(null);
+          setOwnerReplyBanner(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('chat');
+          window.history.replaceState(null, '', url.pathname + url.search || '/');
+          return;
+        }
         setChatSessionId(sessionId);
         setScannerToken(token);
         setChatSession(session);
@@ -400,7 +439,10 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
         }
       })
       .catch(() => {
-        if (!cancelled) setLandingChatRestore(null);
+        if (!cancelled) {
+          clearScannerChatLocal(sessionId);
+          setLandingChatRestore(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLandingChatLoading(false);
@@ -567,6 +609,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
         landingUnreadCount={landingUnreadCount}
         ownerReplyBanner={ownerReplyBanner}
         resumeLandingChat={resumeLandingChat}
+        endLandingChat={() => void endScannerChat()}
         onOpenJoin={onOpenJoin}
       />
     );
@@ -733,6 +776,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                         session={chatSession}
                         role="scanner"
                         onSend={sendScannerMessage}
+                        onEndChat={endScannerChat}
                         desktop
                       />
                     </div>
@@ -747,10 +791,11 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                 ) : (
                 <>
                 {ownerReplyBanner && scannerUnreadCount > 0 && (
+                  <div className="space-y-2">
                   <button
                     type="button"
                     onClick={openChatPanel}
-                    className="p-4 rounded-2xl bg-brand/10 border border-brand/30 text-left transition-colors hover:bg-brand/15"
+                    className="w-full p-4 rounded-2xl bg-brand/10 border border-brand/30 text-left transition-colors hover:bg-brand/15"
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-xl bg-brand/15 flex items-center justify-center shrink-0">
@@ -766,17 +811,34 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                       </span>
                     </div>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void endScannerChat()}
+                    className="w-full text-xs text-muted hover:text-brand py-1"
+                  >
+                    End chat
+                  </button>
+                  </div>
                 )}
 
                 {chatSession && !ownerReplyBanner && (
+                  <div className="space-y-2">
                   <button
                     type="button"
                     onClick={openChatPanel}
-                    className="p-3 rounded-2xl bg-brand/5 border border-brand/20 text-brand font-medium text-sm flex items-center justify-center gap-2"
+                    className="w-full p-3 rounded-2xl bg-brand/5 border border-brand/20 text-brand font-medium text-sm flex items-center justify-center gap-2"
                   >
                     <MessageSquare className="w-4 h-4" />
                     Resume chat with owner
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void endScannerChat()}
+                    className="w-full text-xs text-muted hover:text-brand py-1"
+                  >
+                    End chat
+                  </button>
+                  </div>
                 )}
 
                 <div className="space-y-4 mb-8">
@@ -918,7 +980,13 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                   )}
                   {chatOpen && chatSession && (
                     <div className="p-3 rounded-2xl bg-surface border border-line max-h-[320px] overflow-hidden">
-                      <ChatPanel session={chatSession} role="scanner" onSend={sendScannerMessage} compact />
+                      <ChatPanel
+                        session={chatSession}
+                        role="scanner"
+                        onSend={sendScannerMessage}
+                        onEndChat={endScannerChat}
+                        compact
+                      />
                     </div>
                   )}
                   {(callPhase === 'active' || callPhase === 'connecting') && (

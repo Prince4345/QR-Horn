@@ -8,6 +8,8 @@ type ChatPanelProps = {
   role: 'scanner' | 'owner';
   onSend: (body: string, isQuickReply?: boolean) => Promise<void>;
   onBlock?: () => Promise<void>;
+  /** Anonymous scanner: leave chat and stop resume prompts */
+  onEndChat?: () => void | Promise<void>;
   compact?: boolean;
   /** Full-height mobile owner chat — no fixed min-heights */
   mobile?: boolean;
@@ -50,12 +52,14 @@ export default function ChatPanel({
   role,
   onSend,
   onBlock,
+  onEndChat,
   compact,
   mobile,
   desktop,
 }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
@@ -208,6 +212,16 @@ export default function ChatPanel({
           ? 'This chat session has ended.'
           : null;
 
+  const handleEndChat = async () => {
+    if (!onEndChat || ending) return;
+    setEnding(true);
+    try {
+      await onEndChat();
+    } finally {
+      setEnding(false);
+    }
+  };
+
   return (
     <div
       className={`flex flex-col h-full ${
@@ -217,6 +231,19 @@ export default function ChatPanel({
       {readOnlyBanner && (
         <div className="mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs">
           {readOnlyBanner}
+        </div>
+      )}
+
+      {onEndChat && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleEndChat()}
+            disabled={ending}
+            className="text-xs font-semibold text-muted hover:text-brand disabled:opacity-50"
+          >
+            {ending ? 'Ending…' : 'End chat'}
+          </button>
         </div>
       )}
 

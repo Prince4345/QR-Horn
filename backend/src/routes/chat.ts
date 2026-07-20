@@ -346,6 +346,38 @@ router.post('/scanner/:sessionId/messages', async (req, res) => {
   }
 });
 
+/** Anonymous scanner ends / leaves the chat (clears resume on their device). */
+router.post('/scanner/:sessionId/leave', async (req, res) => {
+  try {
+    const token = String((req.body as { token?: string })?.token ?? req.query.token ?? '');
+    if (!token) {
+      res.status(401).json({ error: 'Scanner token required' });
+      return;
+    }
+
+    const session = await getScannerSession(req.params.sessionId, token);
+    if (!session) {
+      // Already gone — treat as success so the client can clear local state
+      res.json({ success: true });
+      return;
+    }
+
+    if (session.status === 'ACTIVE' || session.status === 'READ_ONLY') {
+      await prisma.chatSession.update({
+        where: { id: session.id },
+        data: { status: 'CLOSED', closedAt: new Date() },
+      });
+      const dto = await getSessionDtoForRole(session.id, 'owner');
+      if (dto) emitChatSessionUpdate(session.ownerId, dto);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('POST /api/chat/scanner/:sessionId/leave:', error);
+    res.status(500).json({ error: 'Failed to leave chat' });
+  }
+});
+
 /** Start chat from scan flow (public) */
 router.post('/start/:vehicleId', async (req, res) => {
   try {

@@ -95,6 +95,21 @@ export function loadScannerToken(sessionId: string): string | null {
   }
 }
 
+export function clearScannerToken(sessionId: string) {
+  try {
+    localStorage.removeItem(SCANNER_TOKEN_KEY(sessionId));
+    localStorage.removeItem(SCANNER_LAST_SEEN_KEY(sessionId));
+  } catch {
+    // private mode
+  }
+}
+
+/** Wipe local anonymous chat resume state for this browser. */
+export function clearScannerChatLocal(sessionId?: string | null) {
+  clearPendingScannerChat();
+  if (sessionId) clearScannerToken(sessionId);
+}
+
 export function buildChatUrl(sessionId: string, basePath?: string): string {
   const path = basePath ?? window.location.pathname;
   const url = new URL(path, window.location.origin);
