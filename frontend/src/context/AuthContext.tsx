@@ -10,6 +10,7 @@ import {
   requestNativePushToken,
 } from '../lib/nativePush';
 import { initNativeOAuthListener, signInWithGoogleNative } from '../lib/nativeOAuth';
+import { syncNativeAuthToken } from '../lib/nativeAuthBridge';
 import { Browser } from '@capacitor/browser';
 
 export interface OwnerProfile {
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data }) => {
         setSession(data.session);
+        syncNativeAuthToken(data.session?.access_token);
       })
       .catch(() => setSession(null))
       .finally(() => setLoading(false));
@@ -108,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Never use async directly in onAuthStateChange — it deadlocks Supabase auth
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      syncNativeAuthToken(newSession?.access_token);
       if (event === 'SIGNED_IN' && Capacitor.isNativePlatform()) {
         void Browser.close().catch(() => {});
       }
@@ -268,6 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
+    syncNativeAuthToken(null);
     setSession(null);
     setOwner(null);
     setSetupComplete(false);

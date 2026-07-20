@@ -51,6 +51,8 @@ export type IncomingChat = {
   vehicleName: string;
   vehicleNumber: string;
   preview: string;
+  /** WhatsApp-style sender label (name or Anonymous · XXXX) */
+  senderName?: string;
 };
 
 /** True when `next` is older than `prev` and should be ignored (stale poll). */

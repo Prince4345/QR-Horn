@@ -288,6 +288,7 @@ export function emitIncomingChat(
     vehicleName: string;
     vehicleNumber: string;
     preview: string;
+    senderName?: string;
   }
 ) {
   if (!io) return;

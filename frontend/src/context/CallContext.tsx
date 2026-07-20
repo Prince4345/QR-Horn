@@ -62,6 +62,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIncomingCall(call);
     setCallPhase('ringing');
     // Heads-up when app is backgrounded / screen off (FCM also fires; this covers socket path)
+    // Always heads-up on OS when not actively looking at the app (background / locked)
     if (document.visibilityState !== 'visible') {
       void import('../lib/alertNotify').then(({ showOsNotification }) =>
         showOsNotification({

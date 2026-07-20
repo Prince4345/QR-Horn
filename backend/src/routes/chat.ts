@@ -11,6 +11,7 @@ import {
 import { checkScanActionLimit } from '../lib/rateLimit.js';
 import { emitChatMessage, emitChatSessionUpdate, emitIncomingChat } from '../socket.js';
 import { sendChatMessagePush } from '../lib/push.js';
+import { displayScannerLabel } from '../lib/chatLabels.js';
 
 const router = Router();
 
@@ -325,11 +326,17 @@ router.post('/scanner/:sessionId/messages', async (req, res) => {
 
     emitChatMessage(req.params.sessionId, result.ownerId, result.message, result.session);
     emitChatSessionUpdate(result.ownerId, result.session);
+    const senderName = displayScannerLabel({
+      id: req.params.sessionId,
+      scannerName: result.session.scannerName,
+    });
+
     emitIncomingChat(result.ownerId, {
       sessionId: req.params.sessionId,
       vehicleName: result.session.vehicleName,
       vehicleNumber: result.session.vehicleNumber,
       preview: result.message.body,
+      senderName,
     });
 
     void sendChatMessagePush(result.ownerId, {
@@ -337,6 +344,7 @@ router.post('/scanner/:sessionId/messages', async (req, res) => {
       vehicleName: result.session.vehicleName,
       vehicleNumber: result.session.vehicleNumber,
       preview: result.message.body,
+      senderName,
     });
 
     res.json({ message: result.message, session: result.session });

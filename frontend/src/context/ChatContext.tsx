@@ -11,6 +11,7 @@ import {
   type ChatSession,
   type IncomingChat,
   chatSessionIdFromLocation,
+  displayScannerLabel,
   isStaleChatSession,
   joinChatAsOwner,
   navigateToOwnerChat,
@@ -103,9 +104,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const viewingThis = openSessionIdRef.current === chat.sessionId;
     // WhatsApp-style OS notification when not already inside that chat
     if (!viewingThis) {
+      const title =
+        chat.senderName?.trim() ||
+        displayScannerLabel({ id: chat.sessionId, scannerName: null });
       void import('../lib/alertNotify').then(({ showOsNotification }) =>
         showOsNotification({
-          title: chat.vehicleName || 'New message',
+          title,
           body: chat.preview,
           kind: 'chat',
           sessionId: chat.sessionId,
@@ -237,6 +241,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           vehicleName: session.vehicleName,
           vehicleNumber: session.vehicleNumber,
           preview: message.body,
+          senderName: displayScannerLabel(session),
         });
       }
       void refreshSessions();
@@ -269,6 +274,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               vehicleName: session.vehicleName,
               vehicleNumber: session.vehicleNumber,
               preview: last.body,
+              senderName: displayScannerLabel(session),
             });
           }
         })
@@ -289,9 +295,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       void openChat(sessionId, { navigate: false });
     };
 
+    const onPendingReply = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId: string; body: string }>).detail;
+      if (!detail?.sessionId || !detail.body?.trim()) return;
+      void (async () => {
+        try {
+          await openChat(detail.sessionId, { navigate: false });
+          await api.sendOwnerChatMessage(detail.sessionId, detail.body.trim());
+          await refreshSessions();
+        } catch {
+          // user can retry in-app
+        }
+      })();
+    };
+
     window.addEventListener('qrhorn:incoming-chat', onIncomingChatPush);
     window.addEventListener('qrhorn:open-chat', onOpenChat);
     window.addEventListener('qrhorn:ping', onIncomingChatPush);
+    window.addEventListener('parkstag:pending-reply', onPendingReply);
 
     return () => {
       unsubIncoming();
@@ -300,6 +321,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('qrhorn:incoming-chat', onIncomingChatPush);
       window.removeEventListener('qrhorn:open-chat', onOpenChat);
       window.removeEventListener('qrhorn:ping', onIncomingChatPush);
+      window.removeEventListener('parkstag:pending-reply', onPendingReply);
     };
   }, [owner?.id, refreshSessions, showIncoming, openChat, applyActiveSession]);
 

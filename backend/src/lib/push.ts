@@ -36,17 +36,25 @@ function isInvalidFcmToken(err: unknown): boolean {
   return code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
 }
 
+type DeviceToken = { token: string; device: string };
+
 /** All registered device tokens for an owner (multi-device table + legacy field). */
-async function collectTokens(ownerId: string): Promise<Set<string>> {
+async function collectTokens(ownerId: string): Promise<DeviceToken[]> {
   const [owner, rows] = await Promise.all([
     prisma.owner.findUnique({ where: { id: ownerId }, select: { fcmToken: true } }),
-    prisma.ownerPushToken.findMany({ where: { ownerId }, select: { token: true } }),
+    prisma.ownerPushToken.findMany({ where: { ownerId }, select: { token: true, device: true } }),
   ]);
 
-  const tokenSet = new Set<string>();
-  if (owner?.fcmToken) tokenSet.add(owner.fcmToken);
-  for (const row of rows) tokenSet.add(row.token);
-  return tokenSet;
+  const byToken = new Map<string, string>();
+  for (const row of rows) {
+    byToken.set(row.token, row.device || 'web');
+  }
+  // Legacy single-token field — treat as web unless already known
+  if (owner?.fcmToken && !byToken.has(owner.fcmToken)) {
+    byToken.set(owner.fcmToken, 'web');
+  }
+
+  return Array.from(byToken.entries()).map(([token, device]) => ({ token, device }));
 }
 
 async function removeToken(ownerId: string, token: string) {
@@ -60,6 +68,11 @@ interface PushSendResult {
   sent: number;
   total: number;
   errors: string[];
+}
+
+function isAndroidNativeDevice(device: string): boolean {
+  const d = device.toLowerCase();
+  return d === 'android-native' || d === 'android' || d === 'native';
 }
 
 function androidChannelId(kind: string | undefined): string {
@@ -97,7 +110,7 @@ async function sendDataToOwnerDevices(
   }
 
   const tokens = await collectTokens(ownerId);
-  if (tokens.size === 0) {
+  if (tokens.length === 0) {
     return { sent: 0, total: 0, errors: ['No devices have notifications enabled'] };
   }
 
@@ -108,26 +121,33 @@ async function sendDataToOwnerDevices(
   let sent = 0;
   const errors: string[] = [];
 
-  for (const token of tokens) {
+  for (const { token, device } of tokens) {
     try {
-      // Data payload for all clients. Android notification shows in the tray
-      // for native tokens; webpush covers browsers (SW handles data-only notify).
+      const androidNative = isAndroidNativeDevice(device);
+
+      // Android native app builds its own tray UI (caller name, Reply, full-screen call).
+      // Data-only ensures onMessageReceived runs even when the app is backgrounded/killed.
+      // Web/browser tokens keep a system notification + webpush.
       await admin.messaging().send({
         token,
         data,
         android: {
           priority: 'high',
           ttl: ttlSeconds * 1000,
-          notification: {
-            title,
-            body,
-            channelId: androidChannelId(data.kind),
-            sound: 'default',
-            defaultVibrateTimings: true,
-            priority: isCall ? 'max' : 'high',
-            visibility: 'public',
-            tag: androidNotificationTag(data),
-          },
+          ...(androidNative
+            ? {}
+            : {
+                notification: {
+                  title,
+                  body,
+                  channelId: androidChannelId(data.kind),
+                  sound: 'default',
+                  defaultVibrateTimings: true,
+                  priority: isCall ? 'max' : 'high',
+                  visibility: 'public',
+                  tag: androidNotificationTag(data),
+                },
+              }),
         },
         ...(webNotification
           ? {
@@ -164,7 +184,7 @@ async function sendDataToOwnerDevices(
     }
   }
 
-  return { sent, total: tokens.size, errors };
+  return { sent, total: tokens.length, errors };
 }
 
 export async function sendPushToOwner(
@@ -176,17 +196,21 @@ export async function sendPushToOwner(
     theftMode: boolean;
     kind?: 'notify' | 'call';
     roomId?: string;
+    /** Optional scanner display name for call notification title */
+    callerName?: string;
   }
 ): Promise<boolean> {
   const isCall = payload.kind === 'call';
-  // WhatsApp-style: short title + clear body
+  const caller = payload.callerName?.trim();
   const title = isCall
-    ? 'Incoming call'
+    ? caller || 'Incoming call'
     : payload.theftMode
       ? 'Theft alert'
       : 'Vehicle alert';
   const body = isCall
-    ? `${payload.vehicleName} · ${payload.vehicleNumber} — tap to answer`
+    ? caller
+      ? `${payload.vehicleName} · ${payload.vehicleNumber} — tap to answer`
+      : `${payload.vehicleName} · ${payload.vehicleNumber} — tap to answer`
     : `${payload.vehicleName} (${payload.vehicleNumber}): ${REASON_TITLES[payload.reason] ?? payload.reason}`;
 
   const appBase = appPublicBase();
@@ -200,10 +224,12 @@ export async function sendPushToOwner(
     body,
     kind: payload.kind ?? 'notify',
     url: relativeUrl,
+    vehicleName: payload.vehicleName,
+    vehicleNumber: payload.vehicleNumber,
   };
   if (payload.roomId) data.roomId = payload.roomId;
+  if (caller) data.callerName = caller;
 
-  // Always include notification payload so Android/web show a tray alert (like WhatsApp)
   const result = await sendDataToOwnerDevices(ownerId, data, isCall ? 60 : 3600, {
     title,
     body,
@@ -221,9 +247,11 @@ export async function sendChatMessagePush(
     vehicleName: string;
     vehicleNumber: string;
     preview: string;
+    /** WhatsApp-style conversation title (scanner name or Anonymous · XXXX) */
+    senderName: string;
   }
 ): Promise<boolean> {
-  const title = payload.vehicleName || payload.vehicleNumber || APP_NAME;
+  const title = payload.senderName.trim() || payload.vehicleName || APP_NAME;
   const body =
     payload.preview.length > 120 ? `${payload.preview.slice(0, 117)}…` : payload.preview;
   const appBase = appPublicBase();
@@ -235,6 +263,9 @@ export async function sendChatMessagePush(
     kind: 'chat',
     url: relativeUrl,
     sessionId: payload.sessionId,
+    senderName: title,
+    vehicleName: payload.vehicleName,
+    vehicleNumber: payload.vehicleNumber,
   };
 
   const result = await sendDataToOwnerDevices(ownerId, data, 3600, {
@@ -251,7 +282,7 @@ export async function sendTestPushToOwner(ownerId: string): Promise<PushSendResu
   return sendDataToOwnerDevices(
     ownerId,
     {
-      title: `🔔 ${APP_NAME} test`,
+      title: `${APP_NAME} test`,
       body: 'Push notifications are working on this device.',
       kind: 'notify',
       url: '/?view=dashboard',

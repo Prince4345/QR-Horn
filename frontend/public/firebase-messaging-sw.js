@@ -21,18 +21,25 @@ const messaging = firebase.messaging();
 function showCallOrAlert(data) {
   const isCall = data.kind === 'call';
   const isChat = data.kind === 'chat';
-  return self.registration.showNotification(data.title ?? 'ParksTAG', {
+  const sessionId = data.sessionId ?? null;
+  const title = data.senderName || data.title || 'ParksTAG';
+  const tag = isCall
+    ? `qrhorn-call-${data.roomId || 'default'}`
+    : isChat
+      ? `qrhorn-chat-${sessionId || 'default'}`
+      : 'qrhorn-alert';
+  return self.registration.showNotification(title, {
     body: data.body ?? 'New vehicle contact',
     icon: '/app-icon-192.png?v=8',
     badge: '/app-icon-192.png?v=8',
-    tag: isCall ? 'qrhorn-call' : isChat ? 'qrhorn-chat' : 'qrhorn-alert',
+    tag,
     renotify: isCall || isChat,
     requireInteraction: isCall,
     vibrate: isCall ? [400, 200, 400, 200, 400] : isChat ? [200, 100, 200] : [200],
     data: {
       url: data.url ?? '/?view=dashboard',
       roomId: data.roomId ?? null,
-      sessionId: data.sessionId ?? null,
+      sessionId,
     },
     actions: isCall
       ? [
@@ -40,7 +47,10 @@ function showCallOrAlert(data) {
           { action: 'decline', title: 'Decline' },
         ]
       : isChat
-        ? [{ action: 'open', title: 'Open' }]
+        ? [
+            { action: 'reply', title: 'Reply' },
+            { action: 'open', title: 'Open' },
+          ]
         : [],
   });
 }

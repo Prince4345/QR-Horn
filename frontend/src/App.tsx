@@ -15,6 +15,7 @@ import BrandWordmark from './components/BrandWordmark';
 import { useAuth } from './context/AuthContext';
 import { useChat } from './context/ChatContext';
 import { useTheme } from './context/ThemeContext';
+import { bindNativeIntentHandler } from './lib/nativeAuthBridge';
 
 const ScannerView = lazy(() => import('./components/ScannerView'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
@@ -88,6 +89,40 @@ function AppNav() {
     };
     window.addEventListener('qrhorn:open-chat', onOpenChat);
     return () => window.removeEventListener('qrhorn:open-chat', onOpenChat);
+  }, []);
+
+  // Android notification Answer / open / pending-reply deep links
+  useEffect(() => {
+    return bindNativeIntentHandler((detail) => {
+      if (detail.url) {
+        window.history.replaceState(null, '', detail.url);
+      }
+      if (detail.kind === 'chat' || detail.sessionId) {
+        const sessionId = detail.sessionId || null;
+        if (sessionId) {
+          setView('dashboard');
+          setScanCode(undefined);
+          setDashboardTab('messages');
+          setDashboardChatId(sessionId);
+          window.dispatchEvent(
+            new CustomEvent('qrhorn:open-chat', { detail: { sessionId } }),
+          );
+          if (detail.pendingReply?.trim()) {
+            window.dispatchEvent(
+              new CustomEvent('parkstag:pending-reply', {
+                detail: { sessionId, body: detail.pendingReply.trim() },
+              }),
+            );
+          }
+        }
+        return;
+      }
+      if (detail.kind === 'call' || detail.roomId) {
+        setView('dashboard');
+        setScanCode(undefined);
+        window.dispatchEvent(new CustomEvent('qrhorn:incoming-call'));
+      }
+    });
   }, []);
 
   useEffect(() => {

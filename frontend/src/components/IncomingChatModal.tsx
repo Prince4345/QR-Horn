@@ -37,7 +37,9 @@ export default function IncomingChatModal() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <h2 className="text-lg font-semibold mb-1">New message</h2>
+            <h2 className="text-lg font-semibold mb-1">
+              {incomingChat.senderName?.trim() || 'New message'}
+            </h2>
             <p className="text-muted text-sm mb-0.5">{incomingChat.vehicleName}</p>
             <p className="text-faint text-xs font-mono mb-3">{incomingChat.vehicleNumber}</p>
             <p className="text-ink text-sm bg-surface rounded-xl p-3 mb-6 line-clamp-3">

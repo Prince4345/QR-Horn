@@ -170,6 +170,18 @@ Or just `npx cap sync android` after `npm run build`.
 - Full-screen intent / wake lock (incoming call urgency)
 - Vibrate
 
+## Call & chat notifications (WhatsApp-style)
+
+After rebuild, the native app should:
+
+- Show **incoming call** in the tray / lock screen with **Answer** and **Decline** (no need to open the app first to know a call is ringing)
+- Show chat as **sender name** (or `Anonymous · AB12`) with message preview
+- Allow **Reply** from the notification shade (sends while signed in)
+
+If calls still do not pop over the lock screen on Android 14+:
+
+**Settings → Apps → ParksTAG → Notifications → Incoming calls** — importance High, and allow full-screen / lock screen.
+
 ## Play Store (later)
 
 1. Create a Play Console account
