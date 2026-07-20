@@ -222,10 +222,12 @@ router.post('/by-number/:number/call', async (req, res) => {
       vehicleNumber: vehicle.number,
     });
 
+    const bodyToken = (req.body as { scannerToken?: string } | undefined)?.scannerToken;
     const chat = await ensureChatSession({
       vehicleId: vehicle.id,
       ownerId: vehicle.ownerId,
       callRoomId: roomId,
+      scannerToken: typeof bodyToken === 'string' ? bodyToken : undefined,
     });
 
     res.json({
@@ -339,10 +341,12 @@ router.post('/:code/call', async (req, res) => {
       vehicleNumber: vehicle.number,
     });
 
+    const bodyToken = (req.body as { scannerToken?: string } | undefined)?.scannerToken;
     const chat = await ensureChatSession({
       vehicleId: vehicle.id,
       ownerId: vehicle.ownerId,
       callRoomId: roomId,
+      scannerToken: typeof bodyToken === 'string' ? bodyToken : undefined,
     });
 
     res.json({

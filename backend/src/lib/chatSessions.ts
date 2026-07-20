@@ -183,6 +183,10 @@ export async function getSessionDtoForRole(
   return formatSessionDto(refreshed, role);
 }
 
+/**
+ * One open chat per (vehicle, scannerToken).
+ * Multiple anonymous people scanning the same QR each get their own thread.
+ */
 export async function ensureChatSession(opts: {
   vehicleId: string;
   ownerId: string;
@@ -191,9 +195,16 @@ export async function ensureChatSession(opts: {
   scannerToken?: string;
   scannerName?: string | null;
 }): Promise<{ sessionId: string; scannerToken: string; created: boolean }> {
+  const scannerToken = opts.scannerToken?.trim() || nanoid(32);
+
+  if (await isScannerBlocked(opts.vehicleId, scannerToken)) {
+    throw new Error('blocked');
+  }
+
   const open = await prisma.chatSession.findFirst({
     where: {
       vehicleId: opts.vehicleId,
+      scannerToken,
       status: { in: ['ACTIVE', 'READ_ONLY'] },
     },
     orderBy: { createdAt: 'desc' },
@@ -217,11 +228,6 @@ export async function ensureChatSession(opts: {
       }
       return { sessionId: refreshed.id, scannerToken: refreshed.scannerToken, created: false };
     }
-  }
-
-  const scannerToken = opts.scannerToken ?? nanoid(32);
-  if (await isScannerBlocked(opts.vehicleId, scannerToken)) {
-    throw new Error('blocked');
   }
 
   const scannerName = opts.scannerName?.trim() || null;

@@ -33,6 +33,7 @@ import {
   isStaleChatSession,
   joinChatAsScanner,
   clearScannerChatLocal,
+  getOrCreateDeviceScannerToken,
   loadPendingScannerChat,
   loadScannerLastSeen,
   loadScannerToken,
@@ -304,11 +305,15 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     setChatLoading(true);
     setError(null);
     try {
-      const existingToken = chatSessionId ? loadScannerToken(chatSessionId) : null;
+      // Always use this browser's device token so each anonymous scanner is isolated
+      const deviceToken =
+        (chatSessionId ? loadScannerToken(chatSessionId) : null) ||
+        scannerToken ||
+        getOrCreateDeviceScannerToken();
       const result = await api.startChat(scanData.vehicleId, {
         reason: opts?.reason ?? selectedReason ?? undefined,
         callRoomId: opts?.callRoomId ?? activeCallRoomId ?? undefined,
-        scannerToken: existingToken ?? scannerToken ?? undefined,
+        scannerToken: deviceToken,
       });
       attachChatSession(result.sessionId, result.scannerToken, result.session, {
         contactMethod: contactMethod ?? undefined,
@@ -509,7 +514,11 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
 
     try {
       await preflightMicPermission();
-      const result = await api.initiateCall(contactMethod, contactId);
+      const deviceToken =
+        (chatSessionId ? loadScannerToken(chatSessionId) : null) ||
+        scannerToken ||
+        getOrCreateDeviceScannerToken();
+      const result = await api.initiateCall(contactMethod, contactId, { scannerToken: deviceToken });
       setActiveCallRoomId(result.roomId);
       if (result.chatSessionId && result.scannerToken) {
         const chat = await api.getScannerChat(result.chatSessionId, result.scannerToken);

@@ -344,7 +344,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ reason }) }
     ),
 
-  initiateCall: (method: ContactMethod, id: string) =>
+  initiateCall: (method: ContactMethod, id: string, opts?: { scannerToken?: string }) =>
     request<{
       success: boolean;
       roomId: string;
@@ -357,7 +357,7 @@ export const api = {
       method === 'qr'
         ? `/api/scan/${encodeURIComponent(id)}/call`
         : `/api/scan/by-number/${encodeURIComponent(id)}/call`,
-      { method: 'POST', body: JSON.stringify({}) }
+      { method: 'POST', body: JSON.stringify({ scannerToken: opts?.scannerToken }) }
     ),
 
   startChat: (vehicleId: string, data?: { reason?: ContactReason; callRoomId?: string; scannerToken?: string }) =>

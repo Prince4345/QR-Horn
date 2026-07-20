@@ -68,6 +68,39 @@ export function isStaleChatSession(next: ChatSession, prev: ChatSession | null):
 const SCANNER_TOKEN_KEY = (sessionId: string) => `qrhorn-chat-token:${sessionId}`;
 const SCANNER_LAST_SEEN_KEY = (sessionId: string) => `qrhorn-chat-seen:${sessionId}`;
 const SCANNER_PENDING_KEY = 'qrhorn-scanner-pending-chat';
+/** Stable per-browser identity so each anonymous scanner gets their own thread per vehicle. */
+const SCANNER_DEVICE_TOKEN_KEY = 'qrhorn-scanner-device-token';
+
+/** Short label so owners can tell multiple Anonymous chats apart. */
+export function anonymousScannerLabel(sessionId: string): string {
+  const short = sessionId.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || 'USER';
+  return `Anonymous · ${short}`;
+}
+
+export function displayScannerLabel(session: {
+  id: string;
+  scannerName?: string | null;
+}): string {
+  const name = session.scannerName?.trim();
+  if (name) return name;
+  return anonymousScannerLabel(session.id);
+}
+
+/** Device-level token sent on startChat / call — isolates scanners on the same QR. */
+export function getOrCreateDeviceScannerToken(): string {
+  try {
+    let token = localStorage.getItem(SCANNER_DEVICE_TOKEN_KEY);
+    if (!token || token.length < 20) {
+      const a = crypto.randomUUID().replace(/-/g, '');
+      const b = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      token = `${a}${b}`;
+      localStorage.setItem(SCANNER_DEVICE_TOKEN_KEY, token);
+    }
+    return token;
+  } catch {
+    return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
 
 export type PendingScannerChat = {
   sessionId: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, CheckCheck, Loader2, RotateCcw, Send, ShieldBan } from 'lucide-react';
-import type { ChatSession } from '../lib/chatClient';
+import { displayScannerLabel, type ChatSession } from '../lib/chatClient';
 
 type ChatPanelProps = {
   session: ChatSession | null;
@@ -43,7 +43,7 @@ function displayNameFor(
   if (senderRole === 'OWNER') {
     return session.ownerName?.trim() || 'Owner';
   }
-  return session.scannerName?.trim() || 'Anonymous';
+  return displayScannerLabel(session);
 }
 
 export default function ChatPanel({

@@ -1,6 +1,6 @@
 import { ArrowLeft, UserRound } from 'lucide-react';
 import ChatPanel from './ChatPanel';
-import type { ChatSession } from '../lib/chatClient';
+import { displayScannerLabel, type ChatSession } from '../lib/chatClient';
 import type { api } from '../lib/api';
 
 type SessionSummary = Awaited<ReturnType<typeof api.getChatSessions>>[number];
@@ -18,8 +18,7 @@ type OwnerMessagesViewProps = {
 
 function contactLabel(s: SessionSummary | ChatSession | undefined): string {
   if (!s) return 'Anonymous';
-  const name = 'scannerName' in s ? s.scannerName : null;
-  return name?.trim() || 'Anonymous';
+  return displayScannerLabel(s);
 }
 
 function ConversationList({
