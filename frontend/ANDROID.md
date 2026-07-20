@@ -174,16 +174,17 @@ Or just `npx cap sync android` after `npm run build`.
 
 After rebuild, the native app should:
 
-- Show **incoming call** in the tray / lock screen with **Answer** and **Decline** (no need to open the app first to know a call is ringing)
+- **Ring on the lock screen** without opening the app (foreground ringing service + Telecom)
+- Show **full-screen Answer / Decline** until you act (or ~90s timeout)
 - Show chat as **sender name** (or `Anonymous · AB12`) with message preview
-- Allow **Reply** from the notification shade (sends while signed in)
+- Allow **Reply** from the notification shade (when signed in)
 
-If calls still do not pop over the lock screen on Android 14+:
+On first launch the app may ask to:
 
-1. **Settings → Apps → ParksTAG → Notifications → Incoming calls** — importance High / lock screen
-2. Allow **Full screen intents** when the app prompts (or Apps → ParksTAG → Special app access)
-3. Disable battery optimization for ParksTAG (Settings → Apps → ParksTAG → Battery → Unrestricted)
-4. Redeploy backend + rebuild the app after call-notification fixes (system tray push + 5‑min FCM TTL)
+1. Allow **full-screen intents**
+2. **Ignore battery optimizations** (Allow) — required so FCM can wake the ringing service
+
+Also set: **Settings → Apps → ParksTAG → Battery → Unrestricted**.
 
 ## Play Store (later)
 

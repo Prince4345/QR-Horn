@@ -52,6 +52,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const clearRing = useCallback((phase: CallPhase = 'idle') => {
     setIncomingCall(null);
     setCallPhase(phase);
+    void import('../lib/nativeAuthBridge').then(({ stopNativeIncomingCall }) =>
+      stopNativeIncomingCall(),
+    );
   }, []);
 
   const showIncoming = useCallback((call: IncomingCall) => {
@@ -61,24 +64,24 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (incomingCallRef.current && incomingCallRef.current.roomId !== call.roomId) return;
     setIncomingCall(call);
     setCallPhase('ringing');
-    // Heads-up when app is backgrounded / screen off (FCM also fires; this covers socket path)
-    // Always heads-up on OS when not actively looking at the app (background / locked)
-    if (document.visibilityState !== 'visible') {
-      void import('../lib/alertNotify').then(({ showOsNotification }) =>
-        showOsNotification({
-          title: 'Incoming call',
-          body: `${call.vehicleName} · ${call.vehicleNumber} — tap to answer`,
-          kind: 'call',
-          roomId: call.roomId,
-          url: `/?view=dashboard&call=${encodeURIComponent(call.roomId)}`,
-        }),
-      );
-    }
+    // Native: continuous ring + lock-screen UI (also covers socket while app is alive)
+    void import('../lib/nativeAuthBridge').then(({ startNativeIncomingCall }) =>
+      startNativeIncomingCall({
+        title: 'Incoming call',
+        body: `${call.vehicleName} · ${call.vehicleNumber}`,
+        roomId: call.roomId,
+      }),
+    );
   }, []);
 
-  // Ring + vibrate while an incoming call is waiting
+  // Ring + vibrate while an incoming call is waiting (web only — native uses IncomingCallService)
   useEffect(() => {
     if (incomingCall) {
+      const isNative =
+        typeof window !== 'undefined' &&
+        !!(window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+          ?.isNativePlatform?.();
+      if (isNative) return;
       startRingtone();
       return stopRingtone;
     }
@@ -238,6 +241,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setMuted(false);
     setCallPhase('connecting');
     setIncomingCall(null);
+    void import('../lib/nativeAuthBridge').then(({ stopNativeIncomingCall }) =>
+      stopNativeIncomingCall(),
+    );
     try {
       const session = await VoiceCallSession.startIncoming(roomId, {
         onRemote: attachRemote,
@@ -268,6 +274,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (decliningRef.current) return;
     decliningRef.current = true;
     const roomId = incomingCall?.roomId;
+    void import('../lib/nativeAuthBridge').then(({ stopNativeIncomingCall }) =>
+      stopNativeIncomingCall(),
+    );
     if (roomId) {
       rememberDismissed(dismissedRoomsRef.current, roomId);
       void declineIncomingCall(roomId);

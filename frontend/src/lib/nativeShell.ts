@@ -4,7 +4,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { App as CapApp } from '@capacitor/app';
 import { bindNativePushHandlers, ensureNativePushChannels } from './nativePush';
 import { initLocalNotificationTaps } from './alertNotify';
-import { ensureFullScreenCallPermission } from './nativeAuthBridge';
+import { ensureBatteryUnrestricted, ensureFullScreenCallPermission } from './nativeAuthBridge';
 
 /** Native shell polish — safe no-op in the browser. */
 export async function initNativeShell(): Promise<void> {
@@ -29,7 +29,10 @@ export async function initNativeShell(): Promise<void> {
     await bindNativePushHandlers();
     await initLocalNotificationTaps();
     // Delay so WebView / sessionStorage are ready
-    window.setTimeout(() => ensureFullScreenCallPermission(), 1500);
+    window.setTimeout(() => {
+      ensureFullScreenCallPermission();
+      ensureBatteryUnrestricted();
+    }, 1500);
   } catch {
     // Push plugin unavailable until google-services.json is present
   }

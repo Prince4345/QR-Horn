@@ -6,7 +6,7 @@ public class ParkstagApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Create high-importance call channel before any FCM arrives
         ParkstagNotificationHelper.ensureChannels(this);
+        ParkstagTelecom.register(this);
     }
 }

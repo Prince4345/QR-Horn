@@ -6,6 +6,10 @@ type ParkstagNative = {
   clearAuth: () => void;
   openFullScreenIntentSettings?: () => void;
   canUseFullScreenIntent?: () => boolean;
+  startIncomingCall?: (title: string, body: string, roomId: string, url: string) => void;
+  stopIncomingCall?: () => void;
+  requestIgnoreBatteryOptimizations?: () => void;
+  isIgnoringBatteryOptimizations?: () => boolean;
 };
 
 function nativeBridge(): ParkstagNative | null {
@@ -29,6 +33,37 @@ export function syncNativeAuthToken(accessToken: string | null | undefined): voi
   }
 }
 
+/** Start native continuous ring + full-screen Answer/Decline. */
+export function startNativeIncomingCall(opts: {
+  title: string;
+  body: string;
+  roomId: string;
+  url?: string;
+}): void {
+  const bridge = nativeBridge();
+  if (!bridge?.startIncomingCall) return;
+  try {
+    bridge.startIncomingCall(
+      opts.title,
+      opts.body,
+      opts.roomId,
+      opts.url ?? `/?view=dashboard&call=${encodeURIComponent(opts.roomId)}`,
+    );
+  } catch {
+    // ignore
+  }
+}
+
+export function stopNativeIncomingCall(): void {
+  const bridge = nativeBridge();
+  if (!bridge?.stopIncomingCall) return;
+  try {
+    bridge.stopIncomingCall();
+  } catch {
+    // ignore
+  }
+}
+
 /** Prompt once for Android 14+ full-screen call permission (lock-screen ringing). */
 export function ensureFullScreenCallPermission(): void {
   const bridge = nativeBridge();
@@ -39,6 +74,21 @@ export function ensureFullScreenCallPermission(): void {
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
     bridge.openFullScreenIntentSettings();
+  } catch {
+    // ignore
+  }
+}
+
+/** Prompt once to exempt ParksTAG from battery optimizations (critical for FCM wake). */
+export function ensureBatteryUnrestricted(): void {
+  const bridge = nativeBridge();
+  if (!bridge?.requestIgnoreBatteryOptimizations || !bridge.isIgnoringBatteryOptimizations) return;
+  try {
+    if (bridge.isIgnoringBatteryOptimizations()) return;
+    const key = 'parkstag-battery-asked';
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+    bridge.requestIgnoreBatteryOptimizations();
   } catch {
     // ignore
   }

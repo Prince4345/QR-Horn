@@ -89,80 +89,8 @@ public final class ParkstagNotificationHelper {
         if (!roomId.isEmpty() && !url.contains("call=")) {
             url = "/?view=dashboard&call=" + roomId;
         }
-
-        int notifyId = stableId("call-" + (roomId.isEmpty() ? "default" : roomId));
-
-        Intent open = openAppIntent(context, url, "call", roomId, null);
-        PendingIntent contentPi =
-                PendingIntent.getActivity(
-                        context,
-                        notifyId,
-                        open,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        Intent answer = openAppIntent(context, url, "call", roomId, null);
-        answer.setAction(ACTION_ANSWER);
-        PendingIntent answerPi =
-                PendingIntent.getActivity(
-                        context,
-                        notifyId + 1,
-                        answer,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        Intent decline = new Intent(context, ParkstagCallActionReceiver.class);
-        decline.setAction(ACTION_DECLINE);
-        decline.putExtra(EXTRA_ROOM_ID, roomId);
-        decline.putExtra(EXTRA_TITLE, title);
-        PendingIntent declinePi =
-                PendingIntent.getBroadcast(
-                        context,
-                        notifyId + 2,
-                        decline,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        // Native full-screen ringing UI over the lock screen
-        Intent fullScreen = new Intent(context, IncomingCallActivity.class);
-        fullScreen.putExtra(IncomingCallActivity.EXTRA_TITLE, title);
-        fullScreen.putExtra(IncomingCallActivity.EXTRA_BODY, body);
-        fullScreen.putExtra(IncomingCallActivity.EXTRA_ROOM_ID, roomId);
-        fullScreen.putExtra(IncomingCallActivity.EXTRA_URL, url);
-        fullScreen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent fullScreenPi =
-                PendingIntent.getActivity(
-                        context,
-                        notifyId + 3,
-                        fullScreen,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        NotificationCompat.Builder builder =
-                new NotificationCompat.Builder(context, CHANNEL_CALLS)
-                        .setSmallIcon(R.mipmap.ic_launcher)
-                        .setContentTitle(title)
-                        .setContentText(body)
-                        .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-                        .setPriority(NotificationCompat.PRIORITY_MAX)
-                        .setCategory(NotificationCompat.CATEGORY_CALL)
-                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setOngoing(true)
-                        .setAutoCancel(false)
-                        .setTimeoutAfter(120_000)
-                        .setContentIntent(contentPi)
-                        .setFullScreenIntent(fullScreenPi, true)
-                        .addAction(0, "Answer", answerPi)
-                        .addAction(0, "Decline", declinePi)
-                        .setColor(ContextCompat.getColor(context, android.R.color.holo_green_dark))
-                        .setDefaults(NotificationCompat.DEFAULT_ALL)
-                        .setVibrate(new long[] {0, 800, 400, 800, 400, 800});
-
-        NotificationManager nm = context.getSystemService(NotificationManager.class);
-        if (nm != null) nm.notify(notifyId, builder.build());
-
-        // Also try launching the ringing UI immediately when the process is awake
-        try {
-            context.startActivity(fullScreen);
-        } catch (Exception ignored) {
-            // fullScreenIntent / heads-up still covers lock screen when allowed
-        }
+        // Full-fledged ring path — service owns audio + full-screen until Answer/Decline
+        IncomingCallService.start(context, title, body, roomId, url);
     }
 
     private static void showChat(Context context, Map<String, String> data) {

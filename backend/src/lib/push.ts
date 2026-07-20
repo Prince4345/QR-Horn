@@ -126,10 +126,11 @@ async function sendDataToOwnerDevices(
     try {
       const androidNative = isAndroidNativeDevice(device);
 
-      // Calls ALWAYS include a system notification tray payload — even for android-native.
-      // Data-only FCM is often held by Doze/OEM until the app is opened (the bug users hit).
-      // Chat on android-native stays data-only so MessagingService can build Reply UI.
-      const useSystemTray = isCall || !androidNative;
+      // Native Android calls: DATA-ONLY + high priority so MessagingService always runs
+      // and can start IncomingCallService (continuous ring + full-screen UI).
+      // A notification payload would prevent onMessageReceived when the app is killed.
+      // Web / browser tokens still get a system tray notification.
+      const useSystemTray = !androidNative || !isCall;
 
       await admin.messaging().send({
         token,

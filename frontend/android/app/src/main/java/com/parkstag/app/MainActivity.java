@@ -139,5 +139,61 @@ public class MainActivity extends BridgeActivity {
                 return false;
             }
         }
+
+        /** Start continuous ring + full-screen UI (socket path while app is alive). */
+        @JavascriptInterface
+        public void startIncomingCall(String title, String body, String roomId, String url) {
+            IncomingCallService.start(
+                    MainActivity.this,
+                    title != null ? title : "Incoming call",
+                    body != null ? body : "",
+                    roomId != null ? roomId : "",
+                    url != null ? url : "/?view=dashboard");
+        }
+
+        @JavascriptInterface
+        public void stopIncomingCall() {
+            IncomingCallService.stop(MainActivity.this);
+        }
+
+        /** Ask user to disable battery optimization so FCM can wake the ringing service. */
+        @JavascriptInterface
+        public void requestIgnoreBatteryOptimizations() {
+            runOnUiThread(
+                    () -> {
+                        try {
+                            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+                            android.os.PowerManager pm =
+                                    (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                            if (pm != null && pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                                return;
+                            }
+                            Intent intent =
+                                    new Intent(
+                                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                            Uri.parse("package:" + getPackageName()));
+                            startActivity(intent);
+                        } catch (Exception ignored) {
+                            try {
+                                Intent fallback =
+                                        new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                                startActivity(fallback);
+                            } catch (Exception ignored2) {
+                            }
+                        }
+                    });
+        }
+
+        @JavascriptInterface
+        public boolean isIgnoringBatteryOptimizations() {
+            try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+                android.os.PowerManager pm =
+                        (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                return pm != null && pm.isIgnoringBatteryOptimizations(getPackageName());
+            } catch (Exception e) {
+                return false;
+            }
+        }
     }
 }

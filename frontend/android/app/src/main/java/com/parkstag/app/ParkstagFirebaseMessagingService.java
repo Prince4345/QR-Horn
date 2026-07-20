@@ -1,6 +1,7 @@
 package com.parkstag.app;
 
 import android.os.PowerManager;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 
@@ -12,11 +13,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Receives FCM and posts call/chat tray UI. For calls with a system notification payload,
- * Android may deliver only when the app is in the foreground — the system tray still shows
- * the FCM notification when the app is killed.
+ * High-priority data FCM for calls starts {@link IncomingCallService} so the phone
+ * rings on the lock screen until Answer/Decline — even when WebView is dead.
  */
 public class ParkstagFirebaseMessagingService extends FirebaseMessagingService {
+    private static final String TAG = "ParkstagFCM";
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -24,10 +25,8 @@ public class ParkstagFirebaseMessagingService extends FirebaseMessagingService {
         try {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             if (pm != null) {
-                wakeLock =
-                        pm.newWakeLock(
-                                PowerManager.PARTIAL_WAKE_LOCK, "parkstag:fcm");
-                wakeLock.acquire(15_000);
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "parkstag:fcm");
+                wakeLock.acquire(20_000);
             }
 
             Map<String, String> data = new HashMap<>();
@@ -42,7 +41,16 @@ public class ParkstagFirebaseMessagingService extends FirebaseMessagingService {
                     data.put("body", remoteMessage.getNotification().getBody());
                 }
             }
-            if (!data.isEmpty()) {
+
+            String kind = data.get("kind");
+            if ("call".equals(kind)) {
+                String title = data.containsKey("title") ? data.get("title") : "Incoming call";
+                String body = data.containsKey("body") ? data.get("body") : "";
+                String roomId = data.containsKey("roomId") ? data.get("roomId") : "";
+                String url = data.containsKey("url") ? data.get("url") : "/?view=dashboard";
+                Log.i(TAG, "Incoming call FCM roomId=" + roomId);
+                IncomingCallService.start(this, title, body, roomId, url);
+            } else if (!data.isEmpty()) {
                 ParkstagNotificationHelper.showFromPushData(this, data);
             }
         } finally {
@@ -54,7 +62,11 @@ public class ParkstagFirebaseMessagingService extends FirebaseMessagingService {
             }
         }
 
-        PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
+        try {
+            PushNotificationsPlugin.sendRemoteMessage(remoteMessage);
+        } catch (Exception e) {
+            Log.w(TAG, "Capacitor forward failed", e);
+        }
     }
 
     @Override
