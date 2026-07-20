@@ -1,8 +1,16 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { Capacitor } from '@capacitor/core';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { api, setAuthTokenGetter } from '../lib/api';
 import { requestFcmToken, initFirebaseMessaging, type FirebasePublicConfig } from '../lib/firebase';
+import {
+  bindNativePushHandlers,
+  nativePushPermissionGranted,
+  requestNativePushToken,
+} from '../lib/nativePush';
+import { initNativeOAuthListener, signInWithGoogleNative } from '../lib/nativeOAuth';
+import { Browser } from '@capacitor/browser';
 
 export interface OwnerProfile {
   id: string;
@@ -98,9 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const authTimeout = setTimeout(() => setLoading(false), 8000);
 
     // Never use async directly in onAuthStateChange — it deadlocks Supabase auth
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      if (event === 'SIGNED_IN' && Capacitor.isNativePlatform()) {
+        void Browser.close().catch(() => {});
+      }
     });
+
+    if (Capacitor.isNativePlatform()) {
+      void initNativeOAuthListener();
+    }
 
     api.getAuthConfig()
       .then((cfg) => setFirebaseConfig(cfg.firebase as unknown as FirebasePublicConfig))
@@ -204,6 +219,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     if (!supabase) throw new Error('Auth not configured');
+    if (Capacitor.isNativePlatform()) {
+      await signInWithGoogleNative();
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/` },
@@ -214,19 +233,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sendPhoneOtp = async (phone: string) => {
     if (!supabase) throw new Error('Auth not configured');
     const formatted = formatPhoneE164(phone);
-    const { error } = await supabase.auth.signInWithOtp({ phone: formatted });
+    // Stay in-app — do not open an external browser for SMS OTP
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: formatted,
+      options: { shouldCreateUser: true },
+    });
     if (error) throw error;
   };
 
   const verifyPhoneOtp = async (phone: string, token: string) => {
     if (!supabase) throw new Error('Auth not configured');
     const formatted = formatPhoneE164(phone);
+    const code = token.trim().replace(/\s+/g, '');
     const { data, error } = await supabase.auth.verifyOtp({
       phone: formatted,
-      token,
+      token: code,
       type: 'sms',
     });
     if (error) throw error;
+    if (!data.session) {
+      throw new Error('Invalid or expired code. Request a new OTP and try again.');
+    }
     setSession(data.session);
   };
 
@@ -250,11 +277,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [firebaseConfig]);
 
   const preparePushNotifications = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      await bindNativePushHandlers();
+      return;
+    }
     const config = await ensureFirebaseConfig();
     await initFirebaseMessaging(config);
   }, [ensureFirebaseConfig]);
 
   const enablePushNotifications = async () => {
+    if (Capacitor.isNativePlatform()) {
+      const token = await requestNativePushToken();
+      await api.saveFcmToken(token, 'android-native');
+      setPushEnabled(true);
+      setOwner((prev) => (prev ? { ...prev, fcmToken: token } : prev));
+      return true;
+    }
+
     const config = await ensureFirebaseConfig();
     const token = await requestFcmToken(config);
     const device =
@@ -276,10 +315,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const autoRegisteredRef = useRef(false);
   useEffect(() => {
     if (!setupComplete || !owner || autoRegisteredRef.current) return;
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    autoRegisteredRef.current = true;
     (async () => {
       try {
+        if (Capacitor.isNativePlatform()) {
+          if (!(await nativePushPermissionGranted())) return;
+          autoRegisteredRef.current = true;
+          const token = await requestNativePushToken();
+          await api.saveFcmToken(token, 'android-native');
+          setPushEnabled(true);
+          console.log('[push] native device token re-registered');
+          return;
+        }
+
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        autoRegisteredRef.current = true;
         const config = await ensureFirebaseConfig();
         const token = await requestFcmToken(config);
         const device =

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ParksTAG — Opening app…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+        background: #0d0118;
+        color: #fff;
+        text-align: center;
+        padding: 24px;
+      }
+      a { color: #ff7eb3; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <p id="msg">Opening ParksTAG…</p>
+      <p style="opacity: 0.7; font-size: 14px; margin-top: 16px">
+        <a id="open" href="#">Tap here if the app does not open</a>
+      </p>
+    </div>
+    <script>
+      (function () {
+        var search = window.location.search || '';
+        var hash = window.location.hash || '';
+        var deep = 'com.parkstag.app://auth/callback' + search + hash;
+        var intent =
+          'intent://auth/callback' +
+          search +
+          hash +
+          '#Intent;scheme=com.parkstag.app;package=com.parkstag.app;end';
+        var link = document.getElementById('open');
+        if (link) link.href = deep;
+        try {
+          window.location.replace(intent);
+        } catch (e) {
+          window.location.href = deep;
+        }
+        setTimeout(function () {
+          var el = document.getElementById('msg');
+          if (el) el.textContent = 'Switch to the ParksTAG app to finish signing in.';
+        }, 1500);
+      })();
+    </script>
+  </body>
+</html>

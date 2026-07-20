@@ -7,6 +7,7 @@ import scanRouter from './routes/scan.js';
 import authRouter from './routes/auth.js';
 import callsRouter from './routes/calls.js';
 import chatRouter from './routes/chat.js';
+import nativeAuthCallbackRouter from './routes/nativeAuthCallback.js';
 import { attachFrontend } from './serveFrontend.js';
 import { prisma } from './lib/prisma.js';
 import { initSocketServer } from './socket.js';
@@ -52,6 +53,9 @@ app.use('/api/vehicles', vehiclesRouter);
 app.use('/api/scan', scanRouter);
 app.use('/api/calls', callsRouter);
 app.use('/api/chat', chatRouter);
+
+// Must be before SPA catch-all — Capacitor Google OAuth bridge
+app.use('/auth', nativeAuthCallbackRouter);
 
 if (isProd) {
   attachFrontend(app);

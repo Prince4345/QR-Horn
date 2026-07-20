@@ -4,6 +4,8 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // Relative asset paths required for Capacitor (file / https://localhost)
+  base: './',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

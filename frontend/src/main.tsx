@@ -6,11 +6,17 @@ import { ChatProvider } from './context/ChatContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { initRingtoneUnlock } from './lib/ringtone';
 import { initMessageSoundUnlock } from './lib/messageSound';
+import { initNativeShell } from './lib/nativeShell';
+import { bounceWebOAuthCallbackToApp } from './lib/nativeOAuth';
 import App from './App.tsx';
 import './index.css';
 
+// If OAuth lands on the website in Chrome, bounce into the Android app
+bounceWebOAuthCallbackToApp();
+
 initRingtoneUnlock();
 initMessageSoundUnlock();
+void initNativeShell();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

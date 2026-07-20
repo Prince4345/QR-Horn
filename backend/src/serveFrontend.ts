@@ -29,7 +29,11 @@ export function attachFrontend(app: Express) {
   );
 
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/socket.io') ||
+      req.path.startsWith('/auth/native-callback')
+    ) {
       next();
       return;
     }

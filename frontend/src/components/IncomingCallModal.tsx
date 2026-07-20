@@ -3,6 +3,7 @@ import { Phone, PhoneOff, Mic, MicOff, Loader2 } from 'lucide-react';
 import { useCall } from '../context/CallContext';
 import CallTimer from './CallTimer';
 import { useState } from 'react';
+import { APP_NAME } from '../lib/brand';
 
 export default function IncomingCallModal() {
   const { incomingCall, callPhase, muted, toggleMute, acceptIncomingCall, declineCall, endActiveCall } = useCall();
@@ -21,6 +22,9 @@ export default function IncomingCallModal() {
     }
   };
 
+  const vehicleName = incomingCall?.vehicleName ?? 'Vehicle';
+  const vehicleNumber = incomingCall?.vehicleNumber ?? '';
+
   return (
     <AnimatePresence>
       {(showIncoming || showActive) && (
@@ -28,38 +32,74 @@ export default function IncomingCallModal() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-ink/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] flex flex-col text-white"
+          style={{
+            background: 'linear-gradient(165deg, #0d0118 0%, #1a0b2e 45%, #24123a 100%)',
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={showIncoming ? 'Incoming call' : 'Active call'}
         >
-          <motion.div
-            initial={{ scale: 0.9, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            className="w-full max-w-sm bg-zinc-900 border border-line rounded-3xl p-8 text-center"
-          >
+          {/* Soft brand glow */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              background:
+                'radial-gradient(ellipse 80% 50% at 50% 20%, rgba(255,0,127,0.22), transparent 70%)',
+            }}
+          />
+
+          <div className="relative z-10 flex flex-1 flex-col items-center px-6 pt-[max(3rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
             {showIncoming && incomingCall && (
               <>
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-brand/10 flex items-center justify-center relative">
-                  <div className="absolute inset-0 rounded-full bg-brand/25 animate-ping" />
-                  <Phone className="w-10 h-10 text-brand relative" />
+                <p className="mt-6 text-xs font-medium tracking-[0.2em] uppercase text-white/50">
+                  {APP_NAME}
+                </p>
+                <p className="mt-2 text-sm text-white/70">Incoming call</p>
+
+                <div className="relative mt-14 mb-8 flex h-36 w-36 items-center justify-center">
+                  <span className="absolute inset-0 rounded-full bg-[#ff007f]/25 animate-ping" />
+                  <span className="absolute inset-3 rounded-full bg-[#ff007f]/15 animate-pulse" />
+                  <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-white/10 ring-2 ring-[#ff007f]/40">
+                    <Phone className="h-12 w-12 text-[#ff007f]" strokeWidth={1.75} />
+                  </div>
                 </div>
-                <h2 className="text-xl font-semibold mb-1">Incoming Voice Call</h2>
-                <p className="text-muted text-sm mb-1">{incomingCall.vehicleName}</p>
-                <p className="text-faint text-xs font-mono mb-8">{incomingCall.vehicleNumber}</p>
-                <p className="text-muted text-xs mb-6">In-app call — like Instagram. No phone number shared.</p>
-                <div className="flex gap-3">
+
+                <h2 className="text-center text-3xl font-semibold tracking-tight">{vehicleName}</h2>
+                <p className="mt-2 font-mono text-sm tracking-wider text-white/55">{vehicleNumber}</p>
+                <p className="mt-6 max-w-xs text-center text-sm text-white/45">
+                  In-app voice call — your phone number stays private.
+                </p>
+
+                <div className="mt-auto flex w-full max-w-sm items-end justify-around pb-4 pt-16">
                   <button
+                    type="button"
                     onClick={declineCall}
                     disabled={accepting}
-                    className="flex-1 py-3 rounded-2xl bg-red-500/20 text-brand font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="flex flex-col items-center gap-3 disabled:opacity-50"
+                    aria-label="Decline call"
                   >
-                    <PhoneOff className="w-4 h-4" /> Decline
+                    <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-900/40 active:scale-95 transition-transform">
+                      <PhoneOff className="h-8 w-8 text-white" />
+                    </span>
+                    <span className="text-sm text-white/70">Decline</span>
                   </button>
+
                   <button
+                    type="button"
                     onClick={handleAccept}
                     disabled={accepting}
-                    className="flex-1 py-3 rounded-2xl bg-green-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                    className="flex flex-col items-center gap-3 disabled:opacity-50"
+                    aria-label="Accept call"
                   >
-                    {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
-                    {accepting ? 'Accepting…' : 'Accept'}
+                    <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-900/40 active:scale-95 transition-transform">
+                      {accepting ? (
+                        <Loader2 className="h-8 w-8 animate-spin text-white" />
+                      ) : (
+                        <Phone className="h-8 w-8 text-white" />
+                      )}
+                    </span>
+                    <span className="text-sm text-white/70">{accepting ? 'Connecting…' : 'Accept'}</span>
                   </button>
                 </div>
               </>
@@ -67,40 +107,64 @@ export default function IncomingCallModal() {
 
             {showActive && !showIncoming && (
               <>
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <Phone className="w-10 h-10 text-green-400" />
+                <p className="mt-6 text-xs font-medium tracking-[0.2em] uppercase text-white/50">
+                  {APP_NAME}
+                </p>
+                <p className="mt-2 text-sm text-white/70">
+                  {callPhase === 'connecting' ? 'Connecting…' : 'On call'}
+                </p>
+
+                <div className="relative mt-14 mb-8 flex h-36 w-36 items-center justify-center">
+                  <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-emerald-500/20 ring-2 ring-emerald-400/40">
+                    <Phone className="h-12 w-12 text-emerald-400" strokeWidth={1.75} />
+                  </div>
                 </div>
-                <h2 className="text-xl font-semibold mb-2">
-                  {callPhase === 'connecting' ? 'Connecting...' : 'Call Active'}
+
+                <h2 className="text-center text-3xl font-semibold tracking-tight">
+                  {callPhase === 'connecting' ? 'Connecting' : 'Call active'}
                 </h2>
                 {callPhase === 'active' ? (
-                  <CallTimer className="block text-3xl text-green-400 mb-2" />
-                ) : null}
-                <p className="text-muted text-sm mb-8">
-                  {callPhase === 'active' ? 'Voice call in progress' : 'Setting up secure voice…'}
-                </p>
-                <div className="flex gap-3">
+                  <CallTimer className="mt-3 block text-4xl font-light tabular-nums text-emerald-400" />
+                ) : (
+                  <p className="mt-3 text-sm text-white/50">Setting up secure voice…</p>
+                )}
+
+                <div className="mt-auto flex w-full max-w-sm items-end justify-around pb-4 pt-16">
                   <button
+                    type="button"
                     onClick={toggleMute}
-                    className={`flex-1 py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors ${
-                      muted
-                        ? 'bg-amber-500/20 text-amber-800 border border-amber-500/30'
-                        : 'bg-soft text-ink hover:bg-soft'
-                    }`}
+                    className="flex flex-col items-center gap-3"
+                    aria-label={muted ? 'Unmute' : 'Mute'}
                   >
-                    {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    {muted ? 'Unmute' : 'Mute'}
+                    <span
+                      className={`flex h-[72px] w-[72px] items-center justify-center rounded-full active:scale-95 transition-transform ${
+                        muted ? 'bg-amber-500/90' : 'bg-white/15'
+                      }`}
+                    >
+                      {muted ? (
+                        <MicOff className="h-8 w-8 text-white" />
+                      ) : (
+                        <Mic className="h-8 w-8 text-white" />
+                      )}
+                    </span>
+                    <span className="text-sm text-white/70">{muted ? 'Unmute' : 'Mute'}</span>
                   </button>
+
                   <button
+                    type="button"
                     onClick={endActiveCall}
-                    className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-semibold flex items-center justify-center gap-2"
+                    className="flex flex-col items-center gap-3"
+                    aria-label="End call"
                   >
-                    <PhoneOff className="w-4 h-4" /> End Call
+                    <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-900/40 active:scale-95 transition-transform">
+                      <PhoneOff className="h-8 w-8 text-white" />
+                    </span>
+                    <span className="text-sm text-white/70">End</span>
                   </button>
                 </div>
               </>
             )}
-          </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

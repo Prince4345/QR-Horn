@@ -62,6 +62,18 @@ interface PushSendResult {
   errors: string[];
 }
 
+function androidChannelId(kind: string | undefined): string {
+  if (kind === 'call') return 'parkstag_calls';
+  if (kind === 'chat') return 'parkstag_messages';
+  return 'parkstag_alerts';
+}
+
+function androidNotificationTag(kind: string | undefined): string {
+  if (kind === 'call') return 'qrhorn-call';
+  if (kind === 'chat') return 'qrhorn-chat';
+  return 'qrhorn-alert';
+}
+
 async function sendDataToOwnerDevices(
   ownerId: string,
   data: Record<string, string>,
@@ -77,16 +89,34 @@ async function sendDataToOwnerDevices(
     return { sent: 0, total: 0, errors: ['No devices have notifications enabled'] };
   }
 
+  const title = webNotification?.title ?? data.title ?? APP_NAME;
+  const body = webNotification?.body ?? data.body ?? 'New vehicle contact';
+  const isCall = data.kind === 'call';
+
   let sent = 0;
   const errors: string[] = [];
 
   for (const token of tokens) {
     try {
-      // Data-only message: the service worker displays it (avoids duplicate
-      // notifications) and handles clicks to open the dashboard.
+      // Data payload for all clients. Android notification shows in the tray
+      // for native tokens; webpush covers browsers (SW handles data-only notify).
       await admin.messaging().send({
         token,
         data,
+        android: {
+          priority: 'high',
+          ttl: ttlSeconds * 1000,
+          notification: {
+            title,
+            body,
+            channelId: androidChannelId(data.kind),
+            sound: 'default',
+            defaultVibrateTimings: true,
+            priority: isCall ? 'max' : 'high',
+            visibility: 'public',
+            tag: androidNotificationTag(data.kind),
+          },
+        },
         ...(webNotification
           ? {
               webpush: {
@@ -97,8 +127,8 @@ async function sendDataToOwnerDevices(
                 notification: {
                   title: webNotification.title,
                   body: webNotification.body,
-                  tag: data.kind === 'call' ? 'qrhorn-call' : data.kind === 'chat' ? 'qrhorn-chat' : 'qrhorn-alert',
-                  requireInteraction: data.kind === 'call',
+                  tag: androidNotificationTag(data.kind),
+                  requireInteraction: isCall,
                 },
                 ...(webNotification.link ? { fcmOptions: { link: webNotification.link } } : {}),
               },
@@ -160,6 +190,8 @@ export async function sendPushToOwner(
   };
   if (payload.roomId) data.roomId = payload.roomId;
 
+  // Calls: webpush notification + Android tray. Notify alerts: data-only for web
+  // (SW displays once); Android still gets a tray notification from data title/body.
   const result = await sendDataToOwnerDevices(
     ownerId,
     data,
