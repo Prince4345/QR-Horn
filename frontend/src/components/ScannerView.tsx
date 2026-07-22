@@ -638,11 +638,11 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     }
 
     return (
-      <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))]">
+      <div className="flex flex-col items-center md:items-stretch w-full px-4 md:px-8 lg:px-12 pt-4 md:pt-8 pb-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-8 sm:p-12 flex flex-col items-center"
+        className="w-full max-w-md md:max-w-none bg-surface border border-line rounded-2xl md:rounded-3xl p-8 md:p-16 flex flex-col items-center min-h-[40vh] md:min-h-[calc(100dvh-8rem)] justify-center"
       >
         <Loader2 className="w-8 h-8 animate-spin text-brand mb-4" />
         <p className="text-muted text-sm">Loading vehicle...</p>
@@ -653,17 +653,17 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
 
   if (error || !scanData) {
     return (
-      <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))]">
+      <div className="flex flex-col items-center md:items-stretch w-full px-4 md:px-8 lg:px-12 pt-4 md:pt-8 pb-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-surface border border-line rounded-2xl sm:rounded-[40px] p-6 sm:p-10 text-center"
+        className="w-full max-w-md md:max-w-none bg-surface border border-line rounded-2xl md:rounded-3xl p-6 md:p-16 text-center min-h-[40vh] md:min-h-[calc(100dvh-8rem)] flex flex-col items-center justify-center"
       >
         <div className="w-16 h-16 bg-brand/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
           <AlertTriangle className="w-8 h-8 text-brand" />
         </div>
-        <h2 className="text-xl font-semibold mb-2">Not Registered</h2>
-        <p className="text-muted text-sm mb-6">{error ?? `This vehicle is not registered with ${APP_NAME}.`}</p>
+        <h2 className="text-xl md:text-3xl font-semibold mb-2">Not Registered</h2>
+        <p className="text-muted text-sm md:text-base mb-6 max-w-lg">{error ?? `This vehicle is not registered with ${APP_NAME}.`}</p>
         <button onClick={handleBack} className="px-6 py-2 rounded-full bg-soft hover:bg-soft text-ink text-sm">
           Try Again
         </button>
@@ -673,25 +673,34 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
   }
 
   const isChatFullscreen = chatOpen && chatSession && status === 'idle';
+  const isIdleScan = status === 'idle' && !isChatFullscreen;
 
   return (
-    <div className="flex flex-col items-center px-4 pt-[calc(4.5rem+env(safe-area-inset-top))] w-full">
+    <div
+      className={`flex flex-col w-full ${
+        isIdleScan || status === 'calling' || isChatFullscreen
+          ? 'px-4 pt-4 pb-4 md:px-0 md:pt-0 md:pb-0'
+          : 'px-4 md:px-8 lg:px-12 pt-4 md:pt-8'
+      }`}
+    >
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className={`w-full mx-auto relative bg-surface border border-line shadow-2xl overflow-hidden flex flex-col ${
- status === 'calling'
- ? 'max-w-md md:max-w-lg rounded-2xl sm:rounded-[40px] min-h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:min-h-0'
- : isChatFullscreen
- ? 'max-w-md md:max-w-3xl lg:max-w-5xl rounded-2xl md:rounded-3xl h-[calc(100dvh-4.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
- : 'max-w-md md:max-w-lg rounded-2xl sm:rounded-[40px] overflow-y-auto max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]'
- }`}
+      exit={{ opacity: 0, y: -12 }}
+      className={`w-full relative bg-surface overflow-hidden flex flex-col ${
+        status === 'calling'
+          ? 'max-w-md mx-auto md:max-w-none border border-line md:border-x-0 md:border-t-0 rounded-2xl sm:rounded-[40px] md:rounded-none shadow-2xl md:shadow-none min-h-[calc(100dvh-5.5rem)] md:min-h-[calc(100dvh-4.5rem)]'
+          : isChatFullscreen
+            ? 'max-w-md mx-auto md:max-w-none border border-line md:border-x-0 md:border-t-0 rounded-2xl md:rounded-none shadow-2xl md:shadow-none h-[calc(100dvh-5.5rem)] md:h-[calc(100dvh-4.5rem)]'
+            : 'max-w-md mx-auto md:max-w-none border border-line md:border-x-0 md:border-t-0 rounded-2xl sm:rounded-[40px] md:rounded-none shadow-2xl md:shadow-none min-h-[calc(100dvh-5.5rem)] md:min-h-[calc(100dvh-4.5rem)]'
+      }`}
     >
       <div
-        className={`flex flex-col h-full relative z-10 min-h-0 ${
- status === 'calling' || isChatFullscreen ? 'p-4 sm:p-6 flex-1' : 'p-5 sm:p-8'
- }`}
+        className={`flex flex-col h-full relative z-10 min-h-0 mx-auto w-full ${
+          status === 'calling' || isChatFullscreen
+            ? 'p-4 sm:p-6 md:px-10 lg:px-16 md:py-8 flex-1 max-w-5xl'
+            : 'p-5 sm:p-8 md:px-10 lg:px-16 md:py-10 lg:py-12 flex-1 max-w-6xl'
+        }`}
       >
         {!scanCode && status !== 'calling' && !isChatFullscreen && (
           <button onClick={handleBack} className="text-sm text-muted hover:text-ink transition-colors mb-4 self-start">
@@ -710,25 +719,25 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
         ) : !isChatFullscreen ? (
         contactMethod === 'plate' ? (
         <motion.div
-          className="text-center mb-8"
+          className="text-center md:text-left mb-8 md:mb-10"
           variants={PLATE_REVEAL_CONTAINER}
           initial="hidden"
           animate="show"
         >
-          <motion.div variants={PLATE_REVEAL_ITEM} className="w-12 h-1 bg-soft rounded-full mx-auto mb-4" />
+          <motion.div variants={PLATE_REVEAL_ITEM} className="w-12 h-1 bg-soft rounded-full mx-auto md:mx-0 mb-4" />
           <motion.p variants={PLATE_REVEAL_ITEM} className="text-faint text-xs tracking-widest uppercase mb-1">
             Vehicle Found
           </motion.p>
-          <motion.h1 variants={PLATE_REVEAL_ITEM} className="text-2xl font-semibold mb-2">
+          <motion.h1 variants={PLATE_REVEAL_ITEM} className="text-2xl md:text-4xl lg:text-5xl font-semibold mb-2">
             {scanData.vehicleName}
           </motion.h1>
           <motion.span
             variants={PLATE_REVEAL_ITEM}
-            className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm tracking-widest text-muted mb-3"
+            className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm md:text-base tracking-widest text-muted mb-3"
           >
             {scanData.vehicleNumber}
           </motion.span>
-          <motion.p variants={PLATE_REVEAL_ITEM} className="text-muted text-sm mb-4">
+          <motion.p variants={PLATE_REVEAL_ITEM} className="text-muted text-sm md:text-base mb-4">
             Contacting vehicle owner anonymously
           </motion.p>
           <motion.div
@@ -743,7 +752,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
               }`}
             />
             <span
-              className={`text-[10px] font-bold uppercase tracking-wider ${
+              className={`text-[10px] md:text-xs font-bold uppercase tracking-wider ${
                 scanData.theftMode ? 'text-red-400' : 'text-green-500'
               }`}
             >
@@ -754,14 +763,14 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
           </motion.div>
         </motion.div>
         ) : (
-        <div className="text-center mb-8">
-          <div className="w-12 h-1 bg-soft rounded-full mx-auto mb-4" />
+        <div className="text-center md:text-left mb-8 md:mb-10">
+          <div className="w-12 h-1 bg-soft rounded-full mx-auto md:mx-0 mb-4" />
           <p className="text-faint text-xs tracking-widest uppercase mb-1">Scanned Vehicle</p>
-          <h1 className="text-2xl font-semibold mb-2">{scanData.vehicleName}</h1>
-          <span className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm tracking-widest text-muted mb-3">
+          <h1 className="text-2xl md:text-4xl lg:text-5xl font-semibold mb-2">{scanData.vehicleName}</h1>
+          <span className="inline-block px-3 py-1 rounded-md bg-soft font-mono text-sm md:text-base tracking-widest text-muted mb-3">
             {scanData.vehicleNumber}
           </span>
-          <p className="text-muted text-sm mb-4">Contacting vehicle owner anonymously</p>
+          <p className="text-muted text-sm md:text-base mb-4">Contacting vehicle owner anonymously</p>
           <div
             className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${
               scanData.theftMode ? 'bg-red-500/15' : 'bg-green-500/10'
@@ -773,7 +782,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
               }`}
             />
             <span
-              className={`text-[10px] font-bold uppercase tracking-wider ${
+              className={`text-[10px] md:text-xs font-bold uppercase tracking-wider ${
                 scanData.theftMode ? 'text-red-400' : 'text-green-500'
               }`}
             >
@@ -907,9 +916,12 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                   </div>
                 )}
 
-                <div className="space-y-4 mb-8">
-                  <p className="text-muted text-sm text-center mb-6">Select a reason to contact the owner anonymously.</p>
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="md:grid md:grid-cols-12 md:gap-10 lg:gap-14 md:items-start">
+                <div className="md:col-span-7 space-y-4 mb-8 md:mb-0">
+                  <p className="text-muted text-sm md:text-base text-center md:text-left mb-4 md:mb-6">
+                    Select a reason to contact the owner anonymously.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-3">
                     {REASONS.map((reason) => {
                       const Icon = reason.icon;
                       const isSelected = selectedReason === reason.id;
@@ -917,21 +929,21 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                         <button
                           key={reason.id}
                           onClick={() => setSelectedReason(reason.id)}
-                          className={`p-4 rounded-2xl flex flex-col items-center gap-2 transition-all ${
- isSelected
- ? 'bg-soft border border-brand/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
- : 'bg-surface border border-line hover:bg-soft'
- }`}
+                          className={`p-4 md:p-5 rounded-2xl flex flex-col items-center gap-2 transition-all ${
+                            isSelected
+                              ? 'bg-soft border border-brand/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                              : 'bg-surface border border-line hover:bg-soft'
+                          }`}
                         >
-                          <Icon className={`w-8 h-8 ${reason.color} mb-1`} />
-                          <span className="text-[10px] uppercase font-bold text-muted">{reason.label}</span>
+                          <Icon className={`w-8 h-8 md:w-9 md:h-9 ${reason.color} mb-1`} />
+                          <span className="text-[10px] md:text-xs uppercase font-bold text-muted">{reason.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className="mt-auto flex flex-col gap-3">
+                <div className="mt-auto md:mt-0 md:col-span-5 flex flex-col gap-3 md:sticky md:top-24">
                   <button
                     onClick={handleNotify}
                     disabled={!selectedReason}
@@ -972,6 +984,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                     <span>Powered by {APP_NAME}</span>
                     <div className="w-8 h-[1px] bg-soft" />
                   </div>
+                </div>
                 </div>
                 </>
                 )}
