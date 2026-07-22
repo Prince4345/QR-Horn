@@ -139,6 +139,16 @@ export interface Activity {
   time: string;
 }
 
+export interface ScanSafetyInfo {
+  hasEmergency: boolean;
+  hasMedical: boolean;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  bloodGroup: string | null;
+  allergies: string | null;
+  medicalInfo: string | null;
+}
+
 export interface ScanData {
   vehicleId: string;
   vehicleName: string;
@@ -147,6 +157,7 @@ export interface ScanData {
   theftMode: boolean;
   stickerCode: string | null;
   registered: boolean;
+  safety?: ScanSafetyInfo | null;
 }
 
 export interface OwnerProfile {

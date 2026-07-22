@@ -49,6 +49,7 @@ import { APP_NAME } from '../lib/brand';
 import BrandLogo from './BrandLogo';
 import ScannerLandingPage from './ScannerLandingPage';
 import PlateLookupLoading from './PlateLookupLoading';
+import ScannerSafetyPanel from './ScannerSafetyPanel';
 
 const PLATE_REVEAL_CONTAINER = {
   hidden: { opacity: 0 },
@@ -349,6 +350,8 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     try {
       const data = await api.getScanData(code);
       setScanData(data);
+      // Theft mode → default to Emergency so ICE / medical info is revealed
+      setSelectedReason(data.theftMode ? 'emergency' : null);
     } catch (err) {
       setScanData(null);
       setError(err instanceof Error ? err.message : 'This QR sticker is invalid or no longer active');
@@ -370,6 +373,7 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
     try {
       const data = await api.lookupByVehicleNumber(plate.trim());
       setScanData(data);
+      setSelectedReason(data.theftMode ? 'emergency' : null);
     } catch (err) {
       setScanData(null);
       setError(
@@ -729,11 +733,23 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
           </motion.p>
           <motion.div
             variants={PLATE_REVEAL_ITEM}
-            className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full"
+            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${
+              scanData.theftMode ? 'bg-red-500/15' : 'bg-green-500/10'
+            }`}
           >
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">
-              Registered · Privacy Mask Active
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                scanData.theftMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'
+              }`}
+            />
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider ${
+                scanData.theftMode ? 'text-red-400' : 'text-green-500'
+              }`}
+            >
+              {scanData.theftMode
+                ? 'Theft alert active'
+                : 'Registered · Privacy Mask Active'}
             </span>
           </motion.div>
         </motion.div>
@@ -746,10 +762,24 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
             {scanData.vehicleNumber}
           </span>
           <p className="text-muted text-sm mb-4">Contacting vehicle owner anonymously</p>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-            <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">
-              Registered · Privacy Mask Active
+          <div
+            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${
+              scanData.theftMode ? 'bg-red-500/15' : 'bg-green-500/10'
+            }`}
+          >
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${
+                scanData.theftMode ? 'bg-red-500 animate-pulse' : 'bg-green-500'
+              }`}
+            />
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider ${
+                scanData.theftMode ? 'text-red-400' : 'text-green-500'
+              }`}
+            >
+              {scanData.theftMode
+                ? 'Theft alert active'
+                : 'Registered · Privacy Mask Active'}
             </span>
           </div>
         </div>
@@ -803,6 +833,29 @@ export default function ScannerView({ scanCode, onOpenJoin }: ScannerViewProps) 
                   </div>
                 ) : (
                 <>
+                {scanData.theftMode && (
+                  <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-left space-y-2">
+                    <p className="text-sm font-bold text-red-300 uppercase tracking-wide">
+                      This vehicle may be stolen
+                    </p>
+                    <p className="text-xs text-muted leading-relaxed">
+                      The owner turned on theft mode. Please contact them urgently via notify,
+                      chat, or call — and use the emergency info below if available.
+                    </p>
+                  </div>
+                )}
+
+                {scanData.safety &&
+                  (scanData.theftMode || selectedReason === 'emergency') && (
+                    <ScannerSafetyPanel
+                      safety={scanData.safety}
+                      theftMode={scanData.theftMode}
+                      revealPhone={
+                        scanData.theftMode || selectedReason === 'emergency'
+                      }
+                    />
+                  )}
+
                 {ownerReplyBanner && scannerUnreadCount > 0 && (
                   <div className="space-y-2">
                   <button

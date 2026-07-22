@@ -116,8 +116,8 @@ export default function VehicleSafetyInfo({ vehicle, mode, onSaved }: VehicleSaf
   const title = mode === 'emergency' ? 'Emergency contact no.' : 'Medical info';
   const description =
     mode === 'emergency'
-      ? 'Someone who can be reached if your vehicle is involved in an emergency. Shared only when a scanner reports an emergency.'
-      : 'Blood group, allergies, and other notes for first responders. Shared only during emergency alerts.';
+      ? 'Someone who can be reached in an emergency. Name and medical notes can appear on scan; the phone number is revealed when a scanner selects Emergency or when theft mode is on.'
+      : 'Blood group, allergies, and other notes for first responders. Shown to scanners during Emergency or when theft mode is on.';
 
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${

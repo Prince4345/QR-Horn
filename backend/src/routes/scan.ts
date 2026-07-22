@@ -83,16 +83,38 @@ function formatVehicleResponse(vehicle: {
   name: string;
   number: string;
   theftMode: boolean;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  bloodGroup: string | null;
+  allergies: string | null;
+  medicalInfo: string | null;
   sticker: { code: string } | null;
 }) {
+  const emergencyContactName = vehicle.emergencyContactName?.trim() || null;
+  const emergencyContactPhone = vehicle.emergencyContactPhone?.trim() || null;
+  const bloodGroup = vehicle.bloodGroup?.trim() || null;
+  const allergies = vehicle.allergies?.trim() || null;
+  const medicalInfo = vehicle.medicalInfo?.trim() || null;
+
   return {
     vehicleId: vehicle.id,
     vehicleName: vehicle.name,
     vehicleNumber: vehicle.number,
+    // Never expose real owner identity / personal phone
     ownerName: 'Vehicle owner',
     theftMode: vehicle.theftMode,
     stickerCode: vehicle.sticker?.code ?? null,
     registered: true,
+    // Owner-configured ICE / medical — intended for scanners in emergencies
+    safety: {
+      hasEmergency: !!(emergencyContactName || emergencyContactPhone),
+      hasMedical: !!(bloodGroup || allergies || medicalInfo),
+      emergencyContactName,
+      emergencyContactPhone,
+      bloodGroup,
+      allergies,
+      medicalInfo,
+    },
   };
 }
 
